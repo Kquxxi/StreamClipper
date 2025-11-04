@@ -1,0 +1,30 @@
+{
+  "clip_id": "BumblingReliablePorpoiseOhMyDog-pbrPAOsv9dqW4Kw5",
+  "state": "done",
+  "url": "/media/exports/BumblingReliablePorpoiseOhMyDog-pbrPAOsv9dqW4Kw5_1080x1920.mp4",
+  "karaoke": "fallback_srt_applied (prev: skipped: karaoke cli failed rc=5)",
+  "karaoke_debug": null,
+  "ffmpeg_cmd": "C:\\ffmpeg\\bin\\ffmpeg.EXE -y -i c:\\Users\\Kquxxi\\Klipy\\media\\clips\\BumblingReliablePorpoiseOhMyDog-pbrPAOsv9dqW4Kw5.mp4 -filter_complex [0:v]crop=floor(iw*0.231951):floor(ih*0.231931):floor(iw*0.008449):floor(ih*0.044005),scale=w='if(gt(a,1080/576),-2,1080)':h='if(gt(a,1080/576),576,-2)',crop=1080:576:floor((iw-1080)/2):floor((ih-576)/2)[cam];[0:v]crop=floor(iw*0.517665):floor(ih*0.988738):floor(iw*0.243472):floor(ih*0.011262),scale=w='if(gt(a,1080/1344),-2,1080)':h='if(gt(a,1080/1344),1344,-2)',crop=1080:1344:floor((iw-1080)/2):floor((ih-1344)/2)[game];[cam][game]vstack=inputs=2[outv] -map [outv] -map 0:a:0? -r 30 -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -c:a aac -b:a 192k -shortest -movflags +faststart c:\\Users\\Kquxxi\\Klipy\\media\\exports\\BumblingReliablePorpoiseOhMyDog-pbrPAOsv9dqW4Kw5_1080x1920.mp4",
+  "params": {
+    "game": {
+      "x": 0.24347158218125958,
+      "y": 0.011261615480232856,
+      "w": 0.5176651305683564,
+      "h": 0.9887383845197671
+    },
+    "camera": {
+      "x": 0.008448540706605223,
+      "y": 0.04400476367329613,
+      "w": 0.23195084485407066,
+      "h": 0.23193063303419842
+    },
+    "game_ratio": 0.7,
+    "auto_split": false,
+    "single_frame": false,
+    "single_height_ratio": 0.4,
+    "fit_mode": "cover",
+    "start": null,
+    "end": null,
+    "include_subtitles": true
+  }
+}

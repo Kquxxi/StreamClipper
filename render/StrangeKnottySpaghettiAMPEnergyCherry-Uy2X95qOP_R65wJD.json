@@ -1,0 +1,30 @@
+{
+  "clip_id": "StrangeKnottySpaghettiAMPEnergyCherry-Uy2X95qOP_R65wJD",
+  "state": "done",
+  "url": "/media/exports/StrangeKnottySpaghettiAMPEnergyCherry-Uy2X95qOP_R65wJD_1080x1920.mp4",
+  "karaoke": "disabled",
+  "karaoke_debug": null,
+  "ffmpeg_cmd": "C:\\ffmpeg\\bin\\ffmpeg.EXE -y -i c:\\Users\\Kquxxi\\Klipy\\media\\clips\\StrangeKnottySpaghettiAMPEnergyCherry-Uy2X95qOP_R65wJD.mp4 -filter_complex [0:v]crop=floor(iw*0.159754):floor(ih*0.188428):floor(iw*0.650538):floor(ih*0.795016),scale=w='if(gt(a,1080/672),-2,1080)':h='if(gt(a,1080/672),672,-2)',crop=1080:672:floor((iw-1080)/2):floor((ih-672)/2)[cam];[0:v]crop=floor(iw*0.572965):floor(ih*1):floor(iw*0.186636):floor(ih*0),scale=w='if(gt(a,1080/1248),-2,1080)':h='if(gt(a,1080/1248),1248,-2)',crop=1080:1248:floor((iw-1080)/2):floor((ih-1248)/2)[game];[cam][game]vstack=inputs=2[outv] -map [outv] -map 0:a:0? -r 30 -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -c:a aac -b:a 192k -shortest -movflags +faststart c:\\Users\\Kquxxi\\Klipy\\media\\exports\\StrangeKnottySpaghettiAMPEnergyCherry-Uy2X95qOP_R65wJD_1080x1920.mp4",
+  "params": {
+    "game": {
+      "x": 0.18663594470046083,
+      "y": 0,
+      "w": 0.5729646697388633,
+      "h": 1
+    },
+    "camera": {
+      "x": 0.6505376344086021,
+      "y": 0.7950162143710531,
+      "w": 0.15975422427035335,
+      "h": 0.18842805939580132
+    },
+    "game_ratio": 0.65,
+    "auto_split": false,
+    "single_frame": false,
+    "single_height_ratio": 0.4,
+    "fit_mode": "cover",
+    "start": null,
+    "end": null,
+    "include_subtitles": false
+  }
+}

@@ -33,13 +33,13 @@
       <th>Akcja</th>
       <th>Streamer</th>
       <th>Tytuł</th>
-      <th>Wyświetlenia</th>
-      <th>Czas</th>
+      <th class="col-views sortable" title="Kliknij, aby sortować">Wyświetlenia</th>
+      <th class="col-time sortable" title="Kliknij, aby sortować">Czas</th>
     </tr>
   </thead>
   <tbody>
   {% for c in clips %}
-    <tr data-streamer="{{ c.broadcaster }}" class="{% if c.broadcaster|lower in highlighted_streamers %}featured-streamer{% endif %}">
+    <tr data-streamer="{{ c.broadcaster }}" data-views="{{ c.views }}" data-created-at="{{ c.created_at }}" class="{% if c.broadcaster|lower in highlighted_streamers %}featured-streamer{% endif %}">
       <td>
         <button class="btn-icon icon-toggle add-to-editor" title="Dodaj/Usuń" data-url="{{ c.url }}" data-broadcaster="{{ c.broadcaster }}" data-title="{{ c.title }}">➕</button>
       </td>

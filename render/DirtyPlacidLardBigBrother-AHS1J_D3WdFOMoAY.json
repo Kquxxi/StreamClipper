@@ -1,0 +1,30 @@
+{
+  "clip_id": "DirtyPlacidLardBigBrother-AHS1J_D3WdFOMoAY",
+  "state": "done",
+  "url": "/media/exports/DirtyPlacidLardBigBrother-AHS1J_D3WdFOMoAY_1080x1920.mp4",
+  "karaoke": "disabled",
+  "karaoke_debug": null,
+  "ffmpeg_cmd": "C:\\ffmpeg\\bin\\ffmpeg.EXE -y -i c:\\Users\\Kquxxi\\Klipy\\media\\clips\\DirtyPlacidLardBigBrother-AHS1J_D3WdFOMoAY.mp4 -filter_complex [0:v]crop=floor(iw*0.295699):floor(ih*0.314775):floor(iw*0.704301):floor(ih*0.685225),scale=w='if(gt(a,1080/768),-2,1080)':h='if(gt(a,1080/768),768,-2)',crop=1080:768:floor((iw-1080)/2):floor((ih-768)/2)[cam];[0:v]crop=floor(iw*0.635945):floor(ih*0.999653):floor(iw*0.21275):floor(ih*0.000347),scale=w='if(gt(a,1080/1152),-2,1080)':h='if(gt(a,1080/1152),1152,-2)',crop=1080:1152:floor((iw-1080)/2):floor((ih-1152)/2)[game];[cam][game]vstack=inputs=2[outv] -map [outv] -map 0:a:0? -r 30 -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -c:a aac -b:a 192k -shortest -movflags +faststart c:\\Users\\Kquxxi\\Klipy\\media\\exports\\DirtyPlacidLardBigBrother-AHS1J_D3WdFOMoAY_1080x1920.mp4",
+  "params": {
+    "game": {
+      "x": 0.21274961597542238,
+      "y": 0.0003472327492117788,
+      "w": 0.6359447004608295,
+      "h": 0.9996527672507882
+    },
+    "camera": {
+      "x": 0.7043010752688172,
+      "y": 0.6852247491207858,
+      "w": 0.29569892473118276,
+      "h": 0.3147752508792142
+    },
+    "game_ratio": 0.6,
+    "auto_split": false,
+    "single_frame": false,
+    "single_height_ratio": 0.4,
+    "fit_mode": "cover",
+    "start": null,
+    "end": null,
+    "include_subtitles": false
+  }
+}

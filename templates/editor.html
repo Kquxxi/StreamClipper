@@ -5,8 +5,23 @@
   <title>Edytor klipów</title>
   <link rel="stylesheet" href="/static/style.css">
   <style>
-    .layout { display:flex; gap:16px; }
+    .layout { display:flex; gap:16px; position:relative; }
     .sidebar { width:280px; max-height:80vh; overflow:auto; border-right:1px solid #ddd; padding-right:12px; }
+    .timeline-sidebar { 
+      position:fixed; bottom:0; left:0; right:0; height:300px;
+      background:white; border-top:2px solid #ddd; 
+      box-shadow:0 -2px 10px rgba(0,0,0,0.1);
+      transform:translateY(100%); transition:transform 0.3s ease;
+      z-index:10; padding:16px; overflow:auto;
+    }
+    .timeline-sidebar.open { transform:translateY(0); }
+    .timeline-toggle { 
+      position:fixed; right:20px; bottom:20px; z-index:11;
+      background:#007cba; color:white; border:none; padding:12px 20px;
+      border-radius:25px; cursor:pointer; font-size:14px;
+      box-shadow:0 2px 10px rgba(0,0,0,0.2);
+    }
+    .timeline-toggle:hover { background:#005a87; transform:translateY(-2px); }
     .clip-item { cursor:pointer; padding:6px; border-radius:6px; }
     .clip-item.active { background:#eef; }
     .player { flex:1; }
@@ -55,7 +70,9 @@
   <div class="container">
     <header>
       <h1>Edytor klipów</h1>
-      <button id="btn-back" class="btn">↩️ Wróć</button>
+      <div style="display:flex; gap:8px;">
+        <button id="btn-back" class="btn">↩️ Wróć</button>
+      </div>
     </header>
     <div id="info" class="status">Inicjalizacja...</div>
 
@@ -117,6 +134,30 @@
            </div>
          </div>
       </section>
+      
+      <button class="timeline-toggle" id="timeline-toggle">📅 Timeline</button>
+      
+      <aside class="timeline-sidebar">
+        <h3>Timeline postów</h3>
+        <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <button id="btn-refresh-timeline" class="btn" type="button">🔄 Odśwież</button>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:flex; align-items:center; gap:6px;">
+            <input type="checkbox" id="filter-scheduled" checked>
+            <span>Zaplanowane</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:6px;">
+            <input type="checkbox" id="filter-published" checked>
+            <span>Opublikowane</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:6px;">
+            <input type="checkbox" id="filter-failed">
+            <span>Nieudane</span>
+          </label>
+        </div>
+        <div id="timeline-content">Ładowanie timeline...</div>
+      </aside>
     </div>
   </div>
 
@@ -248,21 +289,104 @@
         const li = document.createElement('li');
         li.className = 'clip-item' + (active && active.url===c.url ? ' active' : '');
         li.title = c.url;
-        li.addEventListener('click', ()=>selectClip(c));
+        
+        // Kontener dla treści klipu
+        const contentDiv = document.createElement('div');
+        contentDiv.style.display = 'flex';
+        contentDiv.style.justifyContent = 'space-between';
+        contentDiv.style.alignItems = 'center';
+        contentDiv.style.width = '100%';
+        
+        // Lewa strona - tytuł i badge
+        const leftDiv = document.createElement('div');
+        leftDiv.style.flex = '1';
+        leftDiv.style.cursor = 'pointer';
+        leftDiv.addEventListener('click', ()=>selectClip(c));
+        
         const base = document.createElement('span');
         base.textContent = `${c.broadcaster} - ${c.title}`;
-        li.appendChild(base);
+        leftDiv.appendChild(base);
+        
         if (isNew){
           const badge = document.createElement('span');
           badge.textContent = ' NOWE';
           badge.style.color = '#0a0';
           badge.style.fontWeight = '600';
           badge.style.marginLeft = '6px';
-          li.appendChild(badge);
+          leftDiv.appendChild(badge);
         }
+        
+        // Prawa strona - przycisk usuwania
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '🗑️';
+        deleteBtn.title = 'Usuń klip z listy';
+        deleteBtn.style.background = 'none';
+        deleteBtn.style.border = 'none';
+        deleteBtn.style.cursor = 'pointer';
+        deleteBtn.style.padding = '4px';
+        deleteBtn.style.fontSize = '14px';
+        deleteBtn.style.opacity = '0.7';
+        deleteBtn.addEventListener('mouseenter', ()=>{ deleteBtn.style.opacity = '1'; });
+        deleteBtn.addEventListener('mouseleave', ()=>{ deleteBtn.style.opacity = '0.7'; });
+        deleteBtn.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          removeClipFromList(c);
+        });
+        
+        contentDiv.appendChild(leftDiv);
+        contentDiv.appendChild(deleteBtn);
+        li.appendChild(contentDiv);
         listEl.appendChild(li);
       });
 
+    }
+
+    // Usuwanie klipu z listy
+    async function removeClipFromList(clip) {
+      setInfo('Usuwam klip z listy...');
+      try {
+        const r = await fetch('/api/remove-clip-from-list', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ url: clip.url })
+        });
+        const j = await r.json();
+        
+        if (!r.ok || !j.ok) {
+          setInfo('Nie udało się usunąć klipu: ' + (j.error || r.statusText), true);
+          return;
+        }
+        
+        // Usuń z lokalnej listy
+        clips = clips.filter(c => c.url !== clip.url);
+        
+        // Usuń z zapisanych klipów (localStorage)
+        try {
+          const savedClips = JSON.parse(localStorage.getItem('savedClips') || '[]');
+          const filteredSaved = savedClips.filter(c => c.url !== clip.url);
+          localStorage.setItem('savedClips', JSON.stringify(filteredSaved));
+        } catch (e) {
+          console.warn('Nie udało się usunąć z zapisanych klipów:', e);
+        }
+        
+        // Jeśli usuwany klip był aktywny, wyczyść aktywny klip
+        if (active && active.url === clip.url) {
+          active = null;
+          window.active = null;
+          // Wyczyść video
+          const video = document.getElementById('video');
+          if (video) {
+            video.src = '';
+            video.load();
+          }
+        }
+        
+        renderList();
+        setInfo(`Usunięto klip z listy i z ulubionych. Pozostało: ${j.remaining_count} klipów.`);
+        
+      } catch (e) {
+        setInfo('Błąd usuwania klipu: ' + e.message, true);
+      }
     }
 
     // Dodawanie klipu po URL
@@ -711,22 +835,32 @@ if (onlyVertical) {
         <a id="render-link" href="#" target="_blank" style="display:none;">Pobierz wynik</a>
         <button id="btn-render-retry" class="btn" type="button" style="display:none;">🔁 Ponów renderowanie</button>
         <button id="btn-render-error" class="btn" type="button" style="display:none;">ℹ️ Pokaż błąd</button>
+        <button id="btn-remove-rendered" class="btn" type="button" style="display:none; background:#ff6b6b; color:white;">🗑️ Usuń wyrenderowany</button>
         <pre id="render-error-details" style="display:none; max-width:480px; white-space:pre-wrap; background:#fff3f3; border:1px solid #f3caca; padding:8px; border-radius:6px;"></pre>
         <button id="btn-publish" class="btn" type="button" style="display:none;">📣 Opublikuj…</button>
         <div id="publish-panel" style="display:none; gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px; background:#f6f6f6; padding:8px; border-radius:6px;">
           <label style="display:flex; align-items:center; gap:6px;">
-            <input type="radio" name="publish_mode" id="pub-now" value="now" checked>
+            <input type="radio" name="publish_mode" id="pub-now" value="now">
             <span>Publikuj teraz</span>
           </label>
           <label style="display:flex; align-items:center; gap:6px;">
+            <input type="radio" name="publish_mode" id="pub-internal" value="internal" checked>
+            <span>🔄 Zaplanuj wewnętrznie (zalecane)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:6px;">
             <input type="radio" name="publish_mode" id="pub-sched" value="schedule">
-            <span>Zaplanuj publikację</span>
+            <span>Zaplanuj przez Publer</span>
           </label>
           <div id="pub-accounts" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <span style="color:#555;">Konta:</span>
             <span id="pub-accounts-loading" style="color:#888;">Ładowanie kont…</span>
           </div>
-          <input type="datetime-local" id="pub-time" style="display:none;" />
+          <div id="pub-time-container" style="display:none; gap:8px; align-items:center;">
+            <input type="date" id="pub-date" />
+            <select id="pub-time-slot">
+              <option value="">Wybierz godzinę...</option>
+            </select>
+          </div>
           <input type="text" id="pub-caption" placeholder="Podpis posta (opcjonalny)" style="min-width:260px;" />
           <div style="display:flex; gap:8px; align-items:flex-start; flex-wrap:wrap; margin-top:6px;">
             <input type="text" id="pub-tag-groups" placeholder="Grupy tagów (np. twitch, merghani)" style="min-width:260px;" />
@@ -752,6 +886,7 @@ if (onlyVertical) {
   const renderLink = document.getElementById('render-link');
   const btnRenderRetry = document.getElementById('btn-render-retry');
   const btnRenderError = document.getElementById('btn-render-error');
+  const btnRemoveRendered = document.getElementById('btn-remove-rendered');
   const renderErrorDetails = document.getElementById('render-error-details');
   const karaokeStatus = document.getElementById('karaoke-status');
   const includeSubtitlesEl = document.getElementById('include-subtitles');
@@ -902,6 +1037,7 @@ if (onlyVertical) {
         const s = await r.json().catch(()=>({}));
         if (s && s.state === 'done' && s.url){
           renderLink.href = s.url; renderLink.style.display = 'inline-block';
+          if (btnRemoveRendered) btnRemoveRendered.style.display = 'inline-block';
           const btnPublish = document.getElementById('btn-publish'); if (btnPublish) btnPublish.style.display = 'inline-block';
           if (karaokeStatus){ karaokeStatus.style.display = 'inline-block'; karaokeStatus.textContent = `Karaoke: ${s.karaoke || 'brak'}`; }
           setInfo('Render zakończony.');
@@ -963,6 +1099,7 @@ if (onlyVertical) {
         return;
       }
       renderLink.href = j.url; renderLink.style.display = 'inline-block';
+      if (btnRemoveRendered) btnRemoveRendered.style.display = 'inline-block';
       const btnPublish = document.getElementById('btn-publish'); if (btnPublish) btnPublish.style.display = 'inline-block';
       const kinfo = (j.karaoke ? ` (karaoke: ${j.karaoke})` : '');
       if (karaokeStatus){ karaokeStatus.style.display = 'inline-block'; karaokeStatus.textContent = `Karaoke: ${j.karaoke || 'brak'}`; }
@@ -997,6 +1134,42 @@ if (onlyVertical) {
     btnRenderError.addEventListener('click', ()=>{
       const vis = renderErrorDetails.style.display !== 'none';
       renderErrorDetails.style.display = vis ? 'none' : 'block';
+    });
+  }
+  if (btnRemoveRendered){
+    btnRemoveRendered.addEventListener('click', async ()=>{
+      if (!active || !active.clip_id){
+        alert('Brak aktywnego klipu do usunięcia.');
+        return;
+      }
+      
+      btnRemoveRendered.disabled = true;
+      setInfo('Usuwam wyrenderowany klip...');
+      
+      try {
+        const r = await fetch('/api/remove-rendered-clip', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ clip_id: active.clip_id })
+        });
+        const j = await r.json();
+        
+        if (!r.ok || !j.ok) {
+          setInfo('Nie udało się usunąć wyrenderowanego klipu: ' + (j.error || r.statusText), true);
+          return;
+        }
+        
+        // Ukryj link do pobrania i przycisk usuwania
+        if (renderLink) renderLink.style.display = 'none';
+        btnRemoveRendered.style.display = 'none';
+        
+        setInfo('Usunięto wyrenderowany klip. Możesz teraz renderować ponownie.');
+        
+      } catch (e) {
+        setInfo('Błąd usuwania wyrenderowanego klipu: ' + e.message, true);
+      } finally {
+        btnRemoveRendered.disabled = false;
+      }
     });
   }
   </script>
@@ -1058,7 +1231,9 @@ if (onlyVertical) {
     const publishPanel = document.getElementById('publish-panel');
     const pubNow = document.getElementById('pub-now');
     const pubSched = document.getElementById('pub-sched');
-    const pubTime = document.getElementById('pub-time');
+    const pubTimeContainer = document.getElementById('pub-time-container');
+    const pubDate = document.getElementById('pub-date');
+    const pubTimeSlot = document.getElementById('pub-time-slot');
     const pubCaption = document.getElementById('pub-caption');
     const pubTagGroupsInput = document.getElementById('pub-tag-groups');
     const pubTagGroupsSuggest = document.getElementById('pub-tag-groups-suggest');
@@ -1178,15 +1353,39 @@ if (onlyVertical) {
       }
     }
 
+    async function loadTimeSlots(){
+      if (pubTimeSlot?.dataset.loaded === '1') return;
+      try{
+        const r = await fetch('/api/publer/timeslots');
+        const j = await r.json();
+        if (!r.ok || !j.ok){ throw new Error(j.error || r.statusText); }
+        const timeslots = j.timeslots || [];
+        pubTimeSlot.innerHTML = '<option value="">Wybierz godzinę...</option>';
+        timeslots.forEach(slot=>{
+          const option = document.createElement('option');
+          option.value = slot;
+          option.textContent = slot;
+          pubTimeSlot.appendChild(option);
+        });
+        pubTimeSlot.dataset.loaded = '1';
+      }catch(e){
+        console.error('Nie udało się załadować time slotów:', e.message);
+      }
+    }
+
     btnPublish?.addEventListener('click', async ()=>{
       if (!window.active){ alert('Najpierw wybierz klip.'); return; }
       const willShow = (publishPanel.style.display === 'none' || publishPanel.style.display === '');
       publishPanel.style.display = willShow ? 'flex' : 'none';
       publishStatus.textContent = '';
-      if (willShow){ await loadPublerAccounts(); await loadTagGroups(); renderSelectedGroups(); }
+      if (willShow){ await loadPublerAccounts(); await loadTimeSlots(); await loadTagGroups(); renderSelectedGroups(); }
     });
-    pubNow?.addEventListener('change', ()=>{ if (pubNow.checked){ pubTime.style.display = 'none'; }});
-    pubSched?.addEventListener('change', ()=>{ if (pubSched.checked){ pubTime.style.display = 'inline-block'; }});
+
+
+    const pubInternal = document.getElementById('pub-internal');
+    pubNow?.addEventListener('change', ()=>{ if (pubNow.checked){ pubTimeContainer.style.display = 'none'; }});
+    pubInternal?.addEventListener('change', ()=>{ if (pubInternal.checked){ pubTimeContainer.style.display = 'flex'; }});
+    pubSched?.addEventListener('change', ()=>{ if (pubSched.checked){ pubTimeContainer.style.display = 'flex'; }});
     btnPublishConfirm?.addEventListener('click', async ()=>{
       try{
         if (!window.active){ alert('Najpierw wybierz klip.'); return; }
@@ -1215,13 +1414,30 @@ if (onlyVertical) {
           pubCaption.value = caption; // uaktualnij widocznie
         }
         const body = { caption: caption || undefined };
-        if (pubSched.checked){
-          const dt = pubTime.value; // yyyy-MM-ddTHH:mm
-          if (!dt){ publishStatus.textContent = 'Wybierz datę i czas.'; return; }
-          const local = new Date(dt);
-          const iso = new Date(local.getTime() - (local.getTimezoneOffset()*60000)).toISOString().slice(0,19) + 'Z';
+        if (pubInternal.checked){
+          const date = pubDate.value; // yyyy-MM-dd
+          const timeSlot = pubTimeSlot.value; // HH:mm
+          if (!date || !timeSlot){ publishStatus.textContent = 'Wybierz datę i godzinę.'; return; }
+          const dateTimeStr = `${date}T${timeSlot}:00`;
+          const local = new Date(dateTimeStr);
+          const localDate = new Date(local.getFullYear(), local.getMonth(), local.getDate(), 
+                                     local.getHours(), local.getMinutes(), local.getSeconds());
+          const iso = localDate.toISOString();
           body.publish_now = false;
           body.scheduled_at = iso;
+          body.use_internal_scheduler = true;
+        } else if (pubSched.checked){
+          const date = pubDate.value; // yyyy-MM-dd
+          const timeSlot = pubTimeSlot.value; // HH:mm
+          if (!date || !timeSlot){ publishStatus.textContent = 'Wybierz datę i godzinę.'; return; }
+          const dateTimeStr = `${date}T${timeSlot}:00`;
+          const local = new Date(dateTimeStr);
+          const localDate = new Date(local.getFullYear(), local.getMonth(), local.getDate(), 
+                                     local.getHours(), local.getMinutes(), local.getSeconds());
+          const iso = localDate.toISOString();
+          body.publish_now = false;
+          body.scheduled_at = iso;
+          body.use_internal_scheduler = false;
         } else {
           body.publish_now = true;
         }
@@ -1298,6 +1514,129 @@ if (onlyVertical) {
         }
       }catch(e){/* ignore */}
     })();
+  </script>
+
+  <script>
+  // Timeline functionality
+  async function loadTimelineData() {
+    try {
+      const response = await fetch('/api/internal-scheduler/posts');
+      const data = await response.json();
+      window.timelineData = data.posts;
+      await renderTimeline(data.posts);
+    } catch (error) {
+      console.error('Błąd ładowania timeline:', error);
+      document.getElementById('timeline-content').innerHTML = '<div style="color:#f44; padding:8px;">Błąd ładowania timeline</div>';
+    }
+  }
+
+  async function renderTimeline(posts) {
+    const timelineContent = document.getElementById('timeline-content');
+    const filterScheduled = document.getElementById('filter-scheduled').checked;
+    const filterPublished = document.getElementById('filter-published').checked;
+    const filterFailed = document.getElementById('filter-failed').checked;
+
+    let allPosts = [];
+    if (filterScheduled && posts.scheduled) allPosts = allPosts.concat(posts.scheduled);
+    if (filterPublished && posts.published) allPosts = allPosts.concat(posts.published);
+    if (filterFailed && posts.failed) allPosts = allPosts.concat(posts.failed);
+
+    if (allPosts.length === 0) {
+      timelineContent.innerHTML = '<div style="color:#888; padding:8px;">Brak postów do wyświetlenia</div>';
+      return;
+    }
+
+    // Sortuj posty według daty
+    allPosts.sort((a, b) => new Date(b.scheduled_at || b.published_at || 0) - new Date(a.scheduled_at || a.published_at || 0));
+
+    let html = '<div style="display:flex; flex-direction:column; gap:8px;">';
+    
+    // Pobierz dane klipów dla wszystkich postów
+    const clipDataPromises = allPosts.map(async post => {
+      try {
+        const response = await fetch(`/api/clip-data/${post.clip_id}`);
+        const data = await response.json();
+        return { ...post, clipData: data.ok ? data : null };
+      } catch (error) {
+        console.error(`Błąd pobierania danych klipu ${post.clip_id}:`, error);
+        return { ...post, clipData: null };
+      }
+    });
+    
+    const postsWithClipData = await Promise.all(clipDataPromises);
+    
+    postsWithClipData.forEach(post => {
+       // Poprawka strefy czasowej - używaj scheduled_at zamiast scheduled_time
+       const dateField = post.scheduled_at || post.published_at || post.failed_at;
+       if (!dateField) {
+         console.error('Brak daty dla posta:', post);
+         return;
+       }
+       
+       // Parsuj datę jako UTC i wyświetl w czasie lokalnym
+       const utcDate = new Date(dateField);
+       if (isNaN(utcDate.getTime())) {
+         console.error('Nieprawidłowa data:', dateField);
+         return;
+       }
+       
+       const dateStr = utcDate.toLocaleDateString('pl-PL');
+       const timeStr = utcDate.toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'});
+       
+      const statusText = getTimelineStatusText(post.status);
+      const statusColor = post.status === 'pending' ? '#f39c12' : post.status === 'published' ? '#27ae60' : '#e74c3c';
+      
+      // Wyświetl nazwę streamera i tytuł klipu jeśli dostępne
+      let clipTitle = post.clip_id;
+      if (post.clipData && post.clipData.broadcaster && post.clipData.title) {
+        clipTitle = `${post.clipData.broadcaster} - ${post.clipData.title}`;
+      }
+      
+      html += `
+        <div style="border:1px solid #ddd; border-radius:6px; padding:8px; background:#f9f9f9; cursor:pointer;" 
+             onclick="window.open('/editor?clip=${encodeURIComponent(post.clip_id)}', '_blank')">
+          <div style="font-weight:600; margin-bottom:4px;">${clipTitle}</div>
+          <div style="font-size:12px; color:#666; margin-bottom:4px;">${dateStr} ${timeStr}</div>
+          <div style="font-size:12px; color:${statusColor}; font-weight:500;">${statusText}</div>
+        </div>
+      `;
+    });
+    html += '</div>';
+    
+    timelineContent.innerHTML = html;
+  }
+
+  function getTimelineStatusText(status) {
+    switch(status) {
+      case 'pending': return 'Zaplanowany';
+      case 'published': return 'Opublikowany';
+      case 'failed': return 'Nieudany';
+      default: return status;
+    }
+  }
+
+  // Event listeners
+  document.getElementById('btn-refresh-timeline').addEventListener('click', loadTimelineData);
+  document.getElementById('filter-scheduled').addEventListener('change', async () => {
+    if (window.timelineData) await renderTimeline(window.timelineData);
+  });
+  document.getElementById('filter-published').addEventListener('change', async () => {
+    if (window.timelineData) await renderTimeline(window.timelineData);
+  });
+  document.getElementById('filter-failed').addEventListener('change', async () => {
+    if (window.timelineData) await renderTimeline(window.timelineData);
+  });
+
+  // Timeline toggle functionality
+  document.getElementById('timeline-toggle').addEventListener('click', () => {
+    const timeline = document.querySelector('.timeline-sidebar');
+    timeline.classList.toggle('open');
+  });
+
+  // Load timeline on page load
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(loadTimelineData, 500); // Delay to ensure page is ready
+  });
   </script>  }
   }
   }

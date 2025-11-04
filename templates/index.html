@@ -4,6 +4,14 @@
   <meta charset="utf-8">
   <title>Panel Twitch Clips</title>
   <link rel="stylesheet" href="/static/style.css?v={{ cache_buster }}">
+  <style>
+    .dropdown-item:hover {
+      background-color: #f8f9fa;
+    }
+    .dropdown-container.open .dropdown-menu {
+      display: block !important;
+    }
+  </style>
 </head>
 <body>
   <div class="container">
@@ -13,6 +21,7 @@
         <button id="btn-update" class="btn">Odśwież streamerów twitch</button>
         <button id="btn-report" class="btn">Generuj raport Twitch</button>
         <button id="btn-kick" class="btn">Generuj raport Kick</button>
+        <button id="btn-calendar" class="btn">📅 Terminarz</button>
         <a href="/admin" id="admin-link" class="btn" title="Preferencje streamerów">⚙️ Panel admina</a>
         <span id="spinner" style="display:none;margin-left:8px;">⏳</span>
       </div>
@@ -35,6 +44,15 @@
 
     <div id="view-controls" class="subactions" style="margin:12px 0;">
       <button id="btn-hide-viewed" class="btn">Ukryj obejrzane</button>
+      <div class="dropdown-container" style="position:relative; display:inline-block;">
+        <button id="btn-open-unviewed" class="btn" style="background:#28a745; color:white;">🚀 Otwórz nieobejrzane</button>
+        <div id="unviewed-dropdown" class="dropdown-menu" style="display:none; position:absolute; top:100%; left:0; background:white; border:1px solid #ddd; border-radius:4px; box-shadow:0 2px 10px rgba(0,0,0,0.1); z-index:1000; min-width:180px;">
+          <button class="dropdown-item" data-limit="10" style="display:block; width:100%; padding:8px 12px; border:none; background:none; text-align:left; cursor:pointer;">📋 Otwórz 10 klipów</button>
+          <button class="dropdown-item" data-limit="25" style="display:block; width:100%; padding:8px 12px; border:none; background:none; text-align:left; cursor:pointer;">📋 Otwórz 25 klipów</button>
+          <button class="dropdown-item" data-limit="50" style="display:block; width:100%; padding:8px 12px; border:none; background:none; text-align:left; cursor:pointer;">📋 Otwórz 50 klipów</button>
+          <button class="dropdown-item" data-limit="all" style="display:block; width:100%; padding:8px 12px; border:none; background:none; text-align:left; cursor:pointer;">🔥 Otwórz wszystkie</button>
+        </div>
+      </div>
       <span id="global-count" class="hint"></span>
     </div>
 
@@ -45,7 +63,46 @@
     </div>
 
     <main>
-<section id="raport-container" style="display:none;"></section>
+      <!-- Główna strona z raportami -->
+      <div id="main-page" style="display:block;">
+        <section id="raport-container" style="display:none;"></section>
+        <section id="kick-report-container" style="display:none; margin-top:12px;"></section>
+      </div>
+
+      <!-- Osobna strona kalendarza -->
+      <div id="calendar-page" style="display:none;">
+        <div class="calendar-page-header">
+          <button id="btn-back-to-main" class="btn btn-back">← Wróć</button>
+          <h2>📅 Terminarz postów</h2>
+        </div>
+        
+        <section id="calendar-container" style="display:block;">
+          <div class="calendar-header">
+            <div class="calendar-controls">
+              <button id="btn-select-all" class="btn">Zaznacz wszystkie</button>
+              <button id="btn-deselect-all" class="btn">Odznacz wszystkie</button>
+              <button id="btn-push-selected" class="btn btn-primary" disabled>🚀 Push do Publera</button>
+              <button id="btn-refresh-calendar" class="btn">🔄 Odśwież</button>
+            </div>
+          </div>
+          
+          <div class="calendar-filters">
+            <label>
+              <input type="checkbox" id="filter-scheduled" checked> Zaplanowane
+            </label>
+            <label>
+              <input type="checkbox" id="filter-published" checked> Opublikowane
+            </label>
+            <label>
+              <input type="checkbox" id="filter-failed"> Nieudane
+            </label>
+          </div>
+          
+          <div id="calendar-content" class="calendar-content">
+            <div class="loading">Ładowanie terminarza...</div>
+          </div>
+        </section>
+      </div>
 <!-- Stały pasek edytora na dole: dwa przyciski główne -->
 <div id="fallback-editor-controls" style="position:fixed; left:0; right:0; bottom:0; display:flex; gap:8px; padding:8px; background:rgba(20,20,24,0.9); border-top:1px solid #333; justify-content:center; z-index:1000;">
   <button id="fallback-proceed-editor" class="btn" title="Przejdź do edytora z zapisanymi">➕ Dodaj do edytora</button>
@@ -53,7 +110,6 @@
 </div>
 <!-- Overlay zapisanych klipów -->
 <div id="saved-clips-panel" style="display:none; position:fixed; right:12px; bottom:56px; width:360px; max-height:50vh; overflow:auto; background:#15161a; border:1px solid #333; border-radius:6px; box-shadow:0 8px 24px rgba(0,0,0,0.4); padding:10px; z-index:999;"></div>
-      <section id="kick-report-container" style="display:none; margin-top:12px;"></section>
     </main>
   </div>
 
@@ -489,6 +545,11 @@ function pollKick() {
           try { kc.style.display = 'block'; } catch{}
           try { markNewRowsAfterInject(kc); } catch{}
           initReportFiltersAndStats(kc);
+          // Reset calendar button text when showing kick report
+          try { 
+            const btnCalendar = document.getElementById('btn-calendar');
+            if (btnCalendar) btnCalendar.textContent = '📅 Terminarz';
+          } catch{}
           // Zatrzymaj animację i pokaż 100%
           if (kickProgressInterval) { clearInterval(kickProgressInterval); kickProgressInterval = null; }
           if (progressFillElKick) { progressFillElKick.style.width = '100%'; }
@@ -596,6 +657,11 @@ function pollKick() {
       raportContainer.innerHTML = html;
       try { raportContainer.style.display = 'block'; } catch{}
       try { initReportFiltersAndStats(raportContainer); } catch{}
+      // Reset calendar button text when showing report
+      try { 
+        const btnCalendar = document.getElementById('btn-calendar');
+        if (btnCalendar) btnCalendar.textContent = '📅 Terminarz';
+      } catch{}
       // Usunięto lokalne przyciski; używamy globalnego paska i overlayu zapisanych
       (function bindGlobalEditorButtons(){
         const proceedFixed = document.getElementById('fallback-proceed-editor');
@@ -744,6 +810,50 @@ function initReportFiltersAndStats(root) {
   // 2. Pobierz wszystkie wiersze tabeli wewnątrz root
   const rows = Array.from(root.querySelectorAll('#report-table tbody tr'));
 
+  // --- SORTOWANIE: Wyświetlenia (domyślnie) lub Czas (najnowsze) ---
+  const tbody = root.querySelector('#report-table tbody');
+  let sortKey = 'views';
+  function parseRelativeTime(rel){
+    if (!rel || typeof rel !== 'string') return null;
+    const m = rel.match(/(\d+)\s*(d|h|m|s)/i);
+    if (!m) return null;
+    const val = parseInt(m[1], 10);
+    const unit = m[2].toLowerCase();
+    const now = Date.now();
+    const ms = unit==='d'?val*24*3600*1000: unit==='h'?val*3600*1000: unit==='m'?val*60*1000: unit==='s'?val*1000: 0;
+    return new Date(now - ms).getTime();
+  }
+  function createdTs(row){
+    const iso = row.dataset.createdAt || '';
+    const rel = (row.querySelector('td:nth-child(5)')?.textContent || '').trim();
+    let t = iso ? Date.parse(iso) : NaN;
+    if (isNaN(t)) { const approx = parseRelativeTime(rel); t = approx ?? 0; }
+    return t;
+  }
+  function viewsVal(row){
+    const attr = row.dataset.views;
+    if (attr !== undefined){ const n = parseInt(attr, 10); if (!isNaN(n)) return n; }
+    const txt = (row.querySelector('td:nth-child(4)')?.textContent || '').replace(/[^0-9]/g,'');
+    const n2 = parseInt(txt, 10);
+    return isNaN(n2) ? 0 : n2;
+  }
+  function applySort(){
+    if (!tbody) return;
+    const arr = Array.from(tbody.querySelectorAll('tr'));
+    arr.sort((a,b)=> sortKey==='time' ? (createdTs(b)-createdTs(a)) : (viewsVal(b)-viewsVal(a)) );
+    arr.forEach(tr=> tbody.appendChild(tr));
+    // Podświetl aktywną kolumnę sortowania
+    if (thViews) thViews.classList.toggle('active-sort', sortKey==='views');
+    if (thTime)  thTime.classList.toggle('active-sort',  sortKey==='time');
+  }
+  const thViews = root.querySelector('#report-table thead th.col-views') || root.querySelector('#report-table thead th:nth-child(4)');
+  const thTime  = root.querySelector('#report-table thead th.col-time')  || root.querySelector('#report-table thead th:nth-child(5)');
+  if (thViews) thViews.classList.add('sortable');
+  if (thTime)  thTime.classList.add('sortable');
+  if (thViews && !thViews.dataset.bound){ thViews.dataset.bound='1'; thViews.style.cursor='pointer'; thViews.title = thViews.title||'Kliknij, aby sortować po wyświetleniach'; thViews.addEventListener('click', ()=>{ sortKey='views'; applySort(); }); }
+  if (thTime && !thTime.dataset.bound){ thTime.dataset.bound='1'; thTime.style.cursor='pointer'; thTime.title = thTime.title||'Kliknij, aby sortować po czasie (najnowsze)'; thTime.addEventListener('click', ()=>{ sortKey='time'; applySort(); }); }
+  applySort();
+
   // Zaznacz jako obejrzany po kliknięciu linku
   root.addEventListener('click', (e)=>{
     const a = e.target.closest('a[href]');
@@ -871,6 +981,7 @@ function initReportFiltersAndStats(root) {
     const strEl = root.querySelector('#stats-streamers');
     if (strEl) strEl.textContent = topStr.map(([s,n])=>`${s} (${n})`).join(', ');
 
+    applySort();
     // e) lokalne liczniki zostawiamy, globalny licznik zsumujemy poniżej
   }
 
@@ -1309,8 +1420,147 @@ function initReportFiltersAndStats(root) {
     });
   }
 
+  // 7. Obsługa dropdown dla otwierania nieobejrzanych klipów
+  const openUnviewedBtn = document.getElementById('btn-open-unviewed');
+  const unviewedDropdown = document.getElementById('unviewed-dropdown');
+  const dropdownContainer = openUnviewedBtn?.parentElement;
+
+  if (openUnviewedBtn && unviewedDropdown && !openUnviewedBtn.hasAttribute('data-listeners-added')) {
+    // Oznacz, że event listenery zostały dodane
+    openUnviewedBtn.setAttribute('data-listeners-added', 'true');
+    
+    // Toggle dropdown
+    openUnviewedBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdownContainer.classList.toggle('open');
+    });
+
+    // Zamknij dropdown po kliknięciu poza nim
+    const closeDropdown = () => {
+      dropdownContainer.classList.remove('open');
+    };
+    document.addEventListener('click', closeDropdown);
+
+    // Obsługa opcji dropdown
+    unviewedDropdown.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const limit = e.target.dataset.limit;
+      if (limit) {
+        openUnviewedClips(limit);
+        dropdownContainer.classList.remove('open');
+      }
+    });
+  }
+
+  // Funkcja otwierania nieobejrzanych klipów
+  let isOpeningClips = false;
+  function openUnviewedClips(limit) {
+    try {
+      // Zabezpieczenie przed wielokrotnym wywołaniem
+      if (isOpeningClips) {
+        console.log('openUnviewedClips already in progress, ignoring call');
+        return;
+      }
+      isOpeningClips = true;
+      
+      // Pobierz listę obejrzanych klipów
+      const viewedSet = new Set(JSON.parse(localStorage.getItem('viewedClips') || '[]'));
+      console.log('Viewed clips:', Array.from(viewedSet));
+      
+      // Znajdź wszystkie nieobejrzane klipy z aktualnie widocznej tabeli
+      const unviewedClips = [];
+      const rows = document.querySelectorAll('tbody tr');
+      console.log('Total rows found:', rows.length);
+      
+      rows.forEach((row, index) => {
+        // Sprawdź czy wiersz jest ukryty
+        const isHidden = row.style.display === 'none';
+        if (isHidden) {
+          console.log(`Row ${index} is hidden, skipping`);
+          return;
+        }
+        
+        // Znajdź link do klipu w wierszu (trzecia kolumna z tytułem)
+        const clipLink = row.querySelector('td:nth-child(3) a[target="_blank"]');
+        if (!clipLink) {
+          console.log(`Row ${index}: No clip link found`);
+          return;
+        }
+        
+        const clipUrl = clipLink.href;
+        const clipId = clipIdFromUrl(clipUrl);
+        console.log(`Row ${index}: URL=${clipUrl}, ID=${clipId}, viewed=${viewedSet.has(clipId)}`);
+        
+        if (clipId && !viewedSet.has(clipId)) {
+          unviewedClips.push({ id: clipId, url: clipUrl });
+          console.log(`Added clip ${clipId} to unviewed list`);
+        }
+      });
+
+      console.log('Total unviewed clips found:', unviewedClips.length);
+      if (unviewedClips.length === 0) {
+        alert('Brak nieobejrzanych klipów do otwarcia!');
+        return;
+      }
+
+      // Określ liczbę klipów do otwarcia
+      let clipsToOpen = unviewedClips;
+      if (limit !== 'all') {
+        const limitNum = parseInt(limit);
+        clipsToOpen = unviewedClips.slice(0, limitNum);
+        console.log(`Limiting to ${limitNum} clips from ${unviewedClips.length} total`);
+      }
+      console.log('Clips to open:', clipsToOpen.length);
+
+      // Potwierdzenie dla dużej liczby kart
+      if (clipsToOpen.length > 20) {
+        const confirmed = confirm(`Czy na pewno chcesz otworzyć ${clipsToOpen.length} kart? To może spowolnić przeglądarkę.`);
+        if (!confirmed) return;
+      }
+
+      // Otwórz klipy w nowych kartach i oznacz jako obejrzane
+      clipsToOpen.forEach((clip, index) => {
+        console.log(`Scheduling clip ${index + 1}/${clipsToOpen.length}: ${clip.url}`);
+        setTimeout(() => {
+          console.log(`Opening clip ${index + 1}: ${clip.url}`);
+          // Otwórz prawdziwy URL klipu (Kick/Twitch)
+          window.open(clip.url, '_blank');
+          
+          // Oznacz jako obejrzany
+          viewedSet.add(clip.id);
+          try {
+            localStorage.setItem('viewedClips', JSON.stringify(Array.from(viewedSet)));
+            console.log(`Marked clip ${clip.id} as viewed`);
+          } catch(e) {
+            console.error('Error saving to localStorage:', e);
+          }
+        }, index * 100); // Opóźnienie 100ms między otwieraniem kart
+      });
+
+      // Odśwież widok po oznaczeniu jako obejrzane
+      setTimeout(() => {
+        try {
+          if (typeof markViewedRowsGeneric === 'function') markViewedRowsGeneric();
+          if (typeof updateGlobalCounters === 'function') updateGlobalCounters();
+        } catch(e) {}
+      }, clipsToOpen.length * 100 + 500);
+
+      alert(`Otwarto ${clipsToOpen.length} klipów w nowych kartach!`);
+      
+      // Resetuj flagę po zakończeniu
+      setTimeout(() => {
+        isOpeningClips = false;
+      }, clipsToOpen.length * 100 + 1000);
+      
+    } catch (error) {
+      console.error('Błąd podczas otwierania klipów:', error);
+      alert('Wystąpił błąd podczas otwierania klipów.');
+      isOpeningClips = false; // Resetuj flagę w przypadku błędu
+    }
+  }
+
   // Przycisk "Pokaż tylko nowe" / "Pokaż wszystkie"
-  // usunięto przycisk trybu „tylko nowe”, pozostaje filtr obejrzanych
+  // usunięto przycisk trybu „tylko nowe", pozostaje filtr obejrzanych
 
   // Floating FAB: pokaż przycisk "Dalej do edytora" w prawym dolnym rogu, gdy lokalny przycisk niewidoczny
   function setupProceedFabFor(localBtn){
@@ -1475,6 +1725,449 @@ function initReportFiltersAndStats(root) {
   </script>
   <script>
     // Logika lidera wyłączona — wszystkie karty działają samodzielnie
+  </script>
+  
+  <script>
+    // Calendar/Scheduler functionality
+    let calendarData = [];
+    let selectedPosts = new Set();
+    
+    // SPA Navigation State
+    let currentPage = 'main'; // 'main' or 'calendar'
+    let savedReportsState = {
+      twitchVisible: false,
+      kickVisible: false,
+      twitchContent: '',
+      kickContent: ''
+    };
+
+    // SPA Navigation Functions
+    function showMainPage() {
+      document.getElementById('main-page').style.display = 'block';
+      document.getElementById('calendar-page').style.display = 'none';
+      currentPage = 'main';
+      
+      // Restore reports state
+      const raportContainer = document.getElementById('raport-container');
+      const kickReportContainer = document.getElementById('kick-report-container');
+      
+      if (savedReportsState.twitchContent) {
+        raportContainer.innerHTML = savedReportsState.twitchContent;
+      }
+      if (savedReportsState.kickContent) {
+        kickReportContainer.innerHTML = savedReportsState.kickContent;
+      }
+      
+      if (savedReportsState.twitchVisible && savedReportsState.twitchContent) {
+        raportContainer.style.display = 'block';
+      }
+      if (savedReportsState.kickVisible && savedReportsState.kickContent) {
+        kickReportContainer.style.display = 'block';
+      }
+      
+      // Check if we should resume polling based on last known status
+      try {
+        const persisted = readLatest();
+        const st = persisted && persisted.status ? persisted.status : 'idle';
+        if (st === 'scraping' || st === 'generating' || st === 'running') {
+          // Resume polling if report generation is in progress
+          autoGenActive = true;
+          startAutoGenerationPolling();
+        }
+      } catch(e) {
+        console.warn('Error checking status for polling resume:', e);
+      }
+    }
+
+    function showCalendarPage() {
+      // Save current reports state
+      const raportContainer = document.getElementById('raport-container');
+      const kickReportContainer = document.getElementById('kick-report-container');
+      
+      savedReportsState.twitchVisible = raportContainer.style.display === 'block';
+      savedReportsState.kickVisible = kickReportContainer.style.display === 'block';
+      savedReportsState.twitchContent = raportContainer.innerHTML;
+      savedReportsState.kickContent = kickReportContainer.innerHTML;
+      
+      // Stop any active polling when showing calendar
+      try {
+        stopAutoGenerationPolling();
+      } catch(e) {
+        console.warn('Error stopping polling:', e);
+      }
+      
+      // Switch to calendar page
+      document.getElementById('main-page').style.display = 'none';
+      document.getElementById('calendar-page').style.display = 'block';
+      currentPage = 'calendar';
+      
+      // Load calendar data
+      loadCalendarData().catch(console.error);
+    }
+
+    // Initialize SPA navigation
+    document.addEventListener('DOMContentLoaded', function() {
+      const btnCalendar = document.getElementById('btn-calendar');
+      const btnBackToMain = document.getElementById('btn-back-to-main');
+      
+      // Calendar button click handler
+      btnCalendar.addEventListener('click', function() {
+        showCalendarPage();
+      });
+      
+      // Back button click handler
+      btnBackToMain.addEventListener('click', function() {
+        showMainPage();
+      });
+      
+      // Calendar controls
+      document.getElementById('btn-select-all').addEventListener('click', selectAllPosts);
+      document.getElementById('btn-deselect-all').addEventListener('click', deselectAllPosts);
+      document.getElementById('btn-push-selected').addEventListener('click', pushSelectedToPubler);
+      document.getElementById('btn-refresh-calendar').addEventListener('click', loadCalendarData);
+      
+      // Filter checkboxes
+      document.getElementById('filter-scheduled').addEventListener('change', filterCalendarData);
+      document.getElementById('filter-published').addEventListener('change', filterCalendarData);
+      document.getElementById('filter-failed').addEventListener('change', filterCalendarData);
+    });
+    
+    async function loadCalendarData() {
+      try {
+        const response = await fetch('/api/internal-scheduler/posts');
+        const data = await response.json();
+        
+        calendarData = [
+          ...data.posts.scheduled.map(post => ({...post, status: 'scheduled'})),
+          ...data.posts.published.map(post => ({...post, status: 'published'})),
+          ...data.posts.failed.map(post => ({...post, status: 'failed'}))
+        ];
+        
+        await renderCalendar();
+      } catch (error) {
+        console.error('Error loading calendar data:', error);
+        document.getElementById('calendar-content').innerHTML = 
+          '<div class="loading">Błąd ładowania danych terminarza</div>';
+      }
+    }
+    
+    async function renderCalendar() {
+      const content = document.getElementById('calendar-content');
+      const scheduledFilter = document.getElementById('filter-scheduled').checked;
+      const publishedFilter = document.getElementById('filter-published').checked;
+      const failedFilter = document.getElementById('filter-failed').checked;
+      
+      let filteredData = calendarData.filter(post => {
+        if (post.status === 'scheduled' && !scheduledFilter) return false;
+        if (post.status === 'published' && !publishedFilter) return false;
+        if (post.status === 'failed' && !failedFilter) return false;
+        return true;
+      });
+      
+      if (filteredData.length === 0) {
+        content.innerHTML = '<div class="loading">Brak postów do wyświetlenia</div>';
+        return;
+      }
+      
+      // Pobierz dane klipów dla wszystkich postów
+      const clipDataPromises = filteredData.map(async post => {
+        try {
+          const response = await fetch(`/api/clip-data/${post.clip_id}`);
+          const data = await response.json();
+          return { ...post, clipData: data.ok ? data : null };
+        } catch (error) {
+          console.error(`Błąd pobierania danych klipu ${post.clip_id}:`, error);
+          return { ...post, clipData: null };
+        }
+      });
+      
+      const postsWithClipData = await Promise.all(clipDataPromises);
+      
+      const html = postsWithClipData.map(post => {
+        const isSelected = selectedPosts.has(post.id || post.clip_id);
+        const postId = post.id || post.clip_id;
+        
+        // Wyświetl nazwę streamera i tytuł klipu jeśli dostępne
+        let title = post.caption || `Post ${postId}`;
+        if (post.clipData && post.clipData.broadcaster && post.clipData.title) {
+          title = `${post.clipData.broadcaster} - ${post.clipData.title}`;
+        }
+        
+        const date = post.scheduled_at || post.published_at || post.created_at || 'Brak daty';
+        // Poprawka strefy czasowej - parsuj datę jako UTC i wyświetl w czasie lokalnym
+        const utcDate = new Date(date);
+        const formattedDate = utcDate.toLocaleString('pl-PL');
+        
+        return `
+          <div class="calendar-post" style="cursor:pointer;" 
+               onclick="window.open('/editor?clip=${encodeURIComponent(post.clip_id)}', '_blank')">
+            <input type="checkbox" class="calendar-post-checkbox" 
+                   data-post-id="${postId}" ${isSelected ? 'checked' : ''} 
+                   onclick="event.stopPropagation();">
+            <div class="calendar-post-info">
+              <div class="calendar-post-title">${title}</div>
+              <div class="calendar-post-date">${formattedDate}</div>
+              <div class="calendar-post-status status-${post.status}">${getStatusText(post.status)}</div>
+              <div class="calendar-post-actions" onclick="event.stopPropagation();">
+                ${post.status === 'scheduled' ? 
+                  `<button class="btn btn-sm" onclick="editPostTime('${postId}', '${date}')">Edytuj czas</button>
+                   <button class="btn btn-sm" onclick="pushSinglePost('${postId}')">Push</button>
+                   <button class="btn btn-sm btn-danger" onclick="deleteScheduledPost('${postId}')">Usuń</button>` : 
+                  ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      content.innerHTML = html;
+      
+      // Add event listeners to checkboxes
+      content.querySelectorAll('.calendar-post-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+          const postId = this.dataset.postId;
+          if (this.checked) {
+            selectedPosts.add(postId);
+          } else {
+            selectedPosts.delete(postId);
+          }
+          updatePushButton();
+        });
+      });
+    }
+    
+    function getStatusText(status) {
+      switch(status) {
+        case 'scheduled': return 'Zaplanowany';
+        case 'published': return 'Opublikowany';
+        case 'failed': return 'Nieudany';
+        default: return status;
+      }
+    }
+    
+    function selectAllPosts() {
+      const checkboxes = document.querySelectorAll('.calendar-post-checkbox');
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+        selectedPosts.add(checkbox.dataset.postId);
+      });
+      updatePushButton();
+    }
+    
+    function deselectAllPosts() {
+      const checkboxes = document.querySelectorAll('.calendar-post-checkbox');
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+        selectedPosts.delete(checkbox.dataset.postId);
+      });
+      updatePushButton();
+    }
+    
+    function updatePushButton() {
+      const pushButton = document.getElementById('btn-push-selected');
+      const hasScheduledSelected = Array.from(selectedPosts).some(postId => {
+        const post = calendarData.find(p => (p.id || p.clip_id) === postId);
+        return post && post.status === 'scheduled';
+      });
+      
+      pushButton.disabled = !hasScheduledSelected;
+      pushButton.textContent = `🚀 Push do Publera (${selectedPosts.size})`;
+    }
+    
+    async function pushSelectedToPubler() {
+      const scheduledSelected = Array.from(selectedPosts).filter(postId => {
+        const post = calendarData.find(p => (p.id || p.clip_id) === postId);
+        return post && post.status === 'scheduled';
+      });
+      
+      if (scheduledSelected.length === 0) {
+        alert('Nie wybrano żadnych zaplanowanych postów');
+        return;
+      }
+      
+      try {
+        const pushButton = document.getElementById('btn-push-selected');
+        pushButton.disabled = true;
+        pushButton.textContent = 'Szukam wolnych slotów...';
+        
+        // Pobierz dostępne sloty czasowe
+        const slotsResponse = await fetch(`/api/publer/available-slots?count=${scheduledSelected.length}`);
+        const slotsData = await slotsResponse.json();
+        
+        if (!slotsData.ok || !slotsData.available_slots || slotsData.available_slots.length < scheduledSelected.length) {
+          alert(`Nie znaleziono wystarczającej liczby wolnych slotów. Potrzeba: ${scheduledSelected.length}, dostępne: ${slotsData.available_slots?.length || 0}`);
+          return;
+        }
+        
+        pushButton.textContent = 'Przypisuję sloty i przesyłam...';
+        
+        // Przypisz sloty i prześlij posty
+        let successCount = 0;
+        let errorCount = 0;
+        
+        for (let i = 0; i < scheduledSelected.length; i++) {
+          const postId = scheduledSelected[i];
+          const slot = slotsData.available_slots[i];
+          
+          try {
+            // Najpierw zaktualizuj czas w schedulerze
+            const updateResponse = await fetch(`/api/internal-scheduler/posts/${postId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                scheduled_at: slot.datetime
+              })
+            });
+            
+            if (updateResponse.ok) {
+              // Następnie prześlij do Publera
+              const pushResponse = await fetch(`/api/internal-scheduler/push-to-publer/post/${postId}`, {
+                method: 'POST'
+              });
+              
+              if (pushResponse.ok) {
+                successCount++;
+              } else {
+                errorCount++;
+                console.error(`Błąd przesyłania posta ${postId}:`, await pushResponse.text());
+              }
+            } else {
+              errorCount++;
+              console.error(`Błąd aktualizacji czasu posta ${postId}:`, await updateResponse.text());
+            }
+          } catch (error) {
+            errorCount++;
+            console.error(`Błąd przetwarzania posta ${postId}:`, error);
+          }
+        }
+        
+        if (successCount > 0) {
+          alert(`Przesłano ${successCount} postów do Publera z automatycznie przypisanymi slotami czasowymi.${errorCount > 0 ? ` Błędów: ${errorCount}` : ''}`);
+        } else {
+          alert('Nie udało się przesłać żadnego posta');
+        }
+        
+        selectedPosts.clear();
+        loadCalendarData().catch(console.error); // Refresh calendar
+        
+      } catch (error) {
+        console.error('Error pushing posts:', error);
+        alert('Błąd podczas przesyłania postów');
+      } finally {
+        updatePushButton();
+      }
+    }
+    
+    async function pushSinglePost(postId) {
+      try {
+        const response = await fetch(`/api/internal-scheduler/push-to-publer/post/${postId}`, {
+          method: 'POST'
+        });
+        
+        if (response.ok) {
+          alert('Post przesłany do Publera');
+          loadCalendarData().catch(console.error); // Refresh calendar
+        } else {
+          alert('Błąd podczas przesyłania posta');
+        }
+      } catch (error) {
+        console.error('Error pushing post:', error);
+        alert('Błąd podczas przesyłania posta');
+      }
+    }
+    
+    async function editPostTime(postId, currentTime) {
+      try {
+        // Konwertuj aktualny czas na format datetime-local
+        const currentDate = new Date(currentTime);
+        const localDateTime = new Date(currentDate.getTime() - currentDate.getTimezoneOffset() * 60000)
+          .toISOString().slice(0, 16);
+        
+        // Pokaż dialog z inputem datetime-local
+        const newTime = prompt(`Podaj nowy czas publikacji (format: YYYY-MM-DD HH:MM):\n\nAktualny czas: ${currentDate.toLocaleString('pl-PL')}`, 
+          localDateTime.replace('T', ' '));
+        
+        if (!newTime) return; // Użytkownik anulował
+        
+        // Walidacja formatu
+        let newDate;
+        try {
+          // Spróbuj parsować w formacie "YYYY-MM-DD HH:MM"
+          if (newTime.includes(' ')) {
+            const [datePart, timePart] = newTime.split(' ');
+            newDate = new Date(`${datePart}T${timePart}:00`);
+          } else {
+            newDate = new Date(newTime);
+          }
+          
+          if (isNaN(newDate.getTime())) {
+            throw new Error('Invalid date');
+          }
+        } catch (error) {
+          alert('Nieprawidłowy format daty. Użyj formatu: YYYY-MM-DD HH:MM (np. 2024-12-25 14:30)');
+          return;
+        }
+        
+        // Konwertuj na ISO string z poprawną strefą czasową
+        // Użytkownik wprowadza czas lokalny, więc traktujemy go jako lokalny czas
+        // Tworzymy nowy obiekt Date z wprowadzoną datą jako lokalną datą
+        // JavaScript automatycznie obsłuży konwersję na UTC uwzględniając czas letni/zimowy
+        const localDate = new Date(newDate.getFullYear(), newDate.getMonth(), newDate.getDate(), 
+                                   newDate.getHours(), newDate.getMinutes(), newDate.getSeconds());
+        const isoString = localDate.toISOString();
+        
+        // Wyślij żądanie aktualizacji
+        const response = await fetch(`/api/internal-scheduler/posts/${postId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            scheduled_at: isoString
+          })
+        });
+        
+        if (response.ok) {
+          alert(`Czas publikacji został zmieniony na: ${newDate.toLocaleString('pl-PL')}`);
+          loadCalendarData().catch(console.error); // Refresh calendar
+        } else {
+          const errorData = await response.json();
+          alert(`Błąd podczas aktualizacji czasu: ${errorData.error || 'Nieznany błąd'}`);
+        }
+      } catch (error) {
+        console.error('Error editing post time:', error);
+        alert('Błąd podczas edycji czasu posta');
+      }
+    }
+    
+    async function deleteScheduledPost(postId) {
+      if (!confirm('Czy na pewno chcesz usunąć ten zaplanowany post?')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/internal-scheduler/posts/${postId}`, {
+          method: 'DELETE'
+        });
+        
+        if (response.ok) {
+          alert('Post został usunięty z harmonogramu');
+          loadCalendarData().catch(console.error); // Refresh calendar
+        } else {
+          const errorData = await response.json();
+          alert(`Błąd podczas usuwania posta: ${errorData.error || 'Nieznany błąd'}`);
+        }
+      } catch (error) {
+        console.error('Error deleting post:', error);
+        alert('Błąd podczas usuwania posta');
+      }
+    }
+    
+    async function filterCalendarData() {
+      await renderCalendar();
+    }
   </script>
   
   </body>

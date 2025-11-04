@@ -59,6 +59,7 @@ filtered = [
         'title': c['title'],
         'url': c['url'],
         'views': c['views'],
+        'created_at': c.get('created_at', ''),
         'relative_time': (
             lambda created:
                 f"{(now-delta).days}d ago" if (delta := now - datetime.fromisoformat(created.replace('Z','+00:00'))).days > 0

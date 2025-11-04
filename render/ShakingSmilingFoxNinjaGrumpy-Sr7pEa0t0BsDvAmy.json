@@ -1,0 +1,30 @@
+{
+  "clip_id": "ShakingSmilingFoxNinjaGrumpy-Sr7pEa0t0BsDvAmy",
+  "state": "done",
+  "url": "/media/exports/ShakingSmilingFoxNinjaGrumpy-Sr7pEa0t0BsDvAmy_1080x1920.mp4",
+  "karaoke": "applied",
+  "karaoke_debug": null,
+  "ffmpeg_cmd": "C:\\ffmpeg\\bin\\ffmpeg.EXE -y -i c:\\Users\\Kquxxi\\Klipy\\media\\clips\\ShakingSmilingFoxNinjaGrumpy-Sr7pEa0t0BsDvAmy.mp4 -filter_complex [0:v]crop=floor(iw*0.12596):floor(ih*0.215559):floor(iw*0.017665):floor(ih*0.016719),scale=w='if(gt(a,1080/768),-2,1080)':h='if(gt(a,1080/768),768,-2)',crop=1080:768:floor((iw-1080)/2):floor((ih-768)/2)[cam];[0:v]crop=floor(iw*0.525346):floor(ih*0.96691):floor(iw*0.307988):floor(ih*0.03309),scale=w='if(gt(a,1080/1152),-2,1080)':h='if(gt(a,1080/1152),1152,-2)',crop=1080:1152:floor((iw-1080)/2):floor((ih-1152)/2)[game];[cam][game]vstack=inputs=2[outv] -map [outv] -map 0:a:0? -r 30 -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -c:a aac -b:a 192k -shortest -movflags +faststart c:\\Users\\Kquxxi\\Klipy\\media\\exports\\ShakingSmilingFoxNinjaGrumpy-Sr7pEa0t0BsDvAmy_1080x1920.mp4",
+  "params": {
+    "game": {
+      "x": 0.30798771121351765,
+      "y": 0.03309038094227503,
+      "w": 0.5253456221198157,
+      "h": 0.966909619057725
+    },
+    "camera": {
+      "x": 0.017665130568356373,
+      "y": 0.01671880684574338,
+      "w": 0.12596006144393243,
+      "h": 0.21555905893766675
+    },
+    "game_ratio": 0.6,
+    "auto_split": false,
+    "single_frame": false,
+    "single_height_ratio": 0.4,
+    "fit_mode": "cover",
+    "start": null,
+    "end": null,
+    "include_subtitles": true
+  }
+}

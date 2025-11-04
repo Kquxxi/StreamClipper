@@ -18,6 +18,10 @@ import datetime
 import time
 import uuid
 import re
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from scheduler import scheduler
 
 
 app = Flask(
@@ -709,6 +713,68 @@ def api_add_clip_by_url():
     _safe_write_json(get_data_path('selection.json'), {'clips': clips})
     return jsonify({'ok': True, 'clip': clip_obj, 'count': len(clips)})
 
+@app.route('/api/remove-clip-from-list', methods=['POST'])
+def api_remove_clip_from_list():
+    """Usuwa klip z listy zapisanych klipów (selection.json)"""
+    data = request.get_json(silent=True) or {}
+    url = (data.get('url') or '').strip()
+    if not url:
+        return jsonify({'ok': False, 'error': 'Brak URL klipu'}), 400
+    
+    # Usuń z selection.json
+    sel = _safe_read_json(get_data_path('selection.json'), default={'clips': []})
+    clips = sel.get('clips', [])
+    original_count = len(clips)
+    clips = [c for c in clips if c.get('url') != url]
+    new_count = len(clips)
+    
+    if original_count == new_count:
+        return jsonify({'ok': False, 'error': 'Klip nie został znaleziony w liście'}), 404
+    
+    _safe_write_json(get_data_path('selection.json'), {'clips': clips})
+    
+    return jsonify({'ok': True, 'removed_count': original_count - new_count, 'remaining_count': new_count})
+
+@app.route('/api/remove-rendered-clip', methods=['POST'])
+def api_remove_rendered_clip():
+    """Usuwa wyrenderowane pliki klipu z dysku"""
+    data = request.get_json(silent=True) or {}
+    clip_id = (data.get('clip_id') or '').strip()
+    if not clip_id:
+        return jsonify({'ok': False, 'error': 'Brak clip_id'}), 400
+    
+    removed_files = []
+    errors = []
+    
+    # Lista plików do usunięcia
+    files_to_remove = [
+        get_data_path('media', 'clips', f'{clip_id}.mp4'),
+        get_data_path('media', 'previews', f'{clip_id}.mp4'),
+        get_data_path('render', f'{clip_id}.json'),
+    ]
+    
+    for file_path in files_to_remove:
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                removed_files.append(os.path.basename(file_path))
+        except Exception as e:
+            errors.append(f'{os.path.basename(file_path)}: {str(e)}')
+    
+    if not removed_files and not errors:
+        return jsonify({'ok': False, 'error': 'Nie znaleziono plików do usunięcia'}), 404
+    
+    result = {
+        'ok': True,
+        'removed_files': removed_files,
+        'removed_count': len(removed_files)
+    }
+    
+    if errors:
+        result['errors'] = errors
+    
+    return jsonify(result)
+
 @app.route('/editor')
 def editor():
     sel = _safe_read_json(get_data_path('selection.json'), default={'clips': []})
@@ -736,6 +802,40 @@ def _clip_id_from_url(url: str) -> str:
     except Exception:
         pass
     return 'clip'
+
+def _get_clip_data_by_id(clip_id: str):
+    """Pobiera dane klipu (broadcaster, title) na podstawie clip_id z raportów Twitch i Kick"""
+    if not clip_id:
+        return {'broadcaster': None, 'title': None}
+    
+    # Sprawdź w raporcie Twitch
+    twitch_data_path = get_data_path('reports', 'twitch', 'raport_data.json')
+    twitch_data = _safe_read_json(twitch_data_path, {'clips': []})
+    twitch_clips = twitch_data.get('clips', [])
+    
+    for clip in twitch_clips:
+        clip_url = clip.get('url', '')
+        if clip_id in clip_url:
+            return {
+                'broadcaster': clip.get('broadcaster'),
+                'title': clip.get('title')
+            }
+    
+    # Sprawdź w raporcie Kick
+    kick_data_path = get_data_path('kick', 'raport_kick_data.json')
+    kick_data = _safe_read_json(kick_data_path, {'clips': []})
+    kick_clips = kick_data.get('clips', [])
+    
+    for clip in kick_clips:
+        clip_url = clip.get('url', '')
+        if clip_id in clip_url:
+            return {
+                'broadcaster': clip.get('broadcaster'),
+                'title': clip.get('title')
+            }
+    
+    # Jeśli nie znaleziono w raportach, zwróć None
+    return {'broadcaster': None, 'title': None}
 
 def _ensure_media_dirs():
     os.makedirs(get_data_path('media', 'clips'), exist_ok=True)
@@ -2200,7 +2300,34 @@ def api_publish_publer(clip_id: str):
             else:
                 account_ids = [single_account]
     publish_now = bool(data.get('publish_now', True))  # true -> /posts/schedule/publish, false -> /posts/schedule
+    scheduled_at = data.get('scheduled_at')  # ISO datetime string for scheduling
     caption = (data.get('caption') or os.getenv('DEFAULT_CAPTION') or '').strip()
+    use_internal_scheduler = bool(data.get('use_internal_scheduler', False))
+
+    # Jeśli używamy wewnętrznego schedulera, przekieruj do niego
+    if use_internal_scheduler and not publish_now and scheduled_at:
+        try:
+            # Sprawdź czy plik istnieje
+            filename = _export_filename_for(clip_id)
+            local_path = get_data_path('media', 'exports', filename)
+            if not os.path.exists(local_path):
+                return jsonify({'ok': False, 'error': f'export not found: {filename}', 'hint': 'Run /api/render first', 'source': 'app'}), 404
+            
+            # Dodaj do wewnętrznego schedulera
+            post_id = post_scheduler.schedule_post(
+                clip_id=clip_id,
+                scheduled_at=scheduled_at,
+                caption=caption,
+                accounts=account_ids
+            )
+            success = bool(post_id)
+            if success:
+                return jsonify({'ok': True, 'scheduled': True, 'scheduler': 'internal', 'scheduled_at': scheduled_at})
+            else:
+                return jsonify({'ok': False, 'error': 'Failed to schedule post internally', 'source': 'internal_scheduler'}), 500
+        except Exception as e:
+            app.logger.error(f"Internal scheduler error: {e}")
+            return jsonify({'ok': False, 'error': f'Internal scheduler error: {str(e)}', 'source': 'internal_scheduler'}), 500
 
     # znajdź plik exportu
     filename = _export_filename_for(clip_id)
@@ -2233,7 +2360,8 @@ def api_publish_publer(clip_id: str):
                         'media': [{'id': 'MEDIA_ID'}]
                     }
                 },
-                'publish_now': publish_now
+                'publish_now': publish_now,
+                **({'scheduled_at': scheduled_at} if scheduled_at and not publish_now else {})
             }
         }
         _write_publish_log_publer(clip_id, plan, None, 'dry-run')
@@ -2364,17 +2492,25 @@ def api_publish_publer(clip_id: str):
     print(f"[DEBUG] Finalny payload networks: {networks}")
     _write_publish_log_publer(clip_id, {'final_networks': networks}, None, 'debug_networks')
     
+    # Buduj post object z opcjonalnym scheduled_at
+    # Zgodnie z dokumentacją API Publera, scheduled_at musi być w każdym koncie osobno
+    accounts_list = []
+    for aid in account_ids:
+        account_obj = {'id': aid}
+        # Dodaj scheduled_at do każdego konta jeśli jest podany (dla planowania publikacji)
+        if scheduled_at and not publish_now:
+            account_obj['scheduled_at'] = scheduled_at
+        accounts_list.append(account_obj)
+    
+    post_obj = {
+        'networks': networks,
+        'accounts': accounts_list
+    }
+    
     post_payload = {
         'bulk': {
             'state': 'scheduled',
-            'posts': [
-                {
-                    'networks': networks,
-                    'accounts': [
-                        { 'id': aid } for aid in account_ids
-                    ]
-                }
-            ]
+            'posts': [post_obj]
         }
     }
 
@@ -2525,6 +2661,85 @@ def api_publer_accounts():
     except Exception as e:
         return jsonify({'ok': False, 'error': f'Exception: {e}'}), 502
 
+# Endpoint do pobierania predefiniowanych time slotów z Publera
+@app.route('/api/publer/timeslots', methods=['GET'])
+def api_publer_timeslots():
+    """Zwraca predefiniowane time sloty dla Publera (30-minutowe interwały)."""
+    # Generujemy sloty co 30 minut od 00:00 do 23:30
+    timeslots = []
+    for hour in range(24):
+        for minute in [0, 30]:
+            time_str = f"{hour:02d}:{minute:02d}"
+            timeslots.append(time_str)
+    
+    return jsonify({
+        'ok': True,
+        'timeslots': timeslots,
+        'description': 'Predefiniowane sloty czasowe Publera (co 30 minut)'
+    })
+
+@app.route('/api/publer/available-slots', methods=['GET'])
+def api_publer_available_slots():
+    """Znajdź najbliższe wolne sloty czasowe w Publerze."""
+    try:
+        from datetime import datetime, timedelta
+        import pytz
+        
+        # Pobierz parametry
+        count = int(request.args.get('count', 5))  # ile slotów zwrócić
+        start_date = request.args.get('start_date')  # opcjonalna data początkowa
+        
+        # Ustaw datę początkową
+        if start_date:
+            base_date = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        else:
+            # Rozpocznij od następnej godziny
+            base_date = datetime.now(pytz.UTC) + timedelta(hours=1)
+            base_date = base_date.replace(minute=0, second=0, microsecond=0)
+        
+        # Generuj sloty co 30 minut
+        available_slots = []
+        current_time = base_date
+        
+        # Pobierz zaplanowane posty z schedulera
+        scheduled_times = set()
+        try:
+            for post in scheduler.data["scheduled"]:
+                if post.get('scheduled_at'):
+                    scheduled_dt = datetime.fromisoformat(post['scheduled_at'].replace('Z', '+00:00'))
+                    scheduled_times.add(scheduled_dt.replace(second=0, microsecond=0))
+        except Exception as e:
+            logger.warning(f"Błąd pobierania zaplanowanych postów: {e}")
+        
+        # Znajdź wolne sloty
+        while len(available_slots) < count:
+            # Sprawdź czy slot jest wolny (nie ma zaplanowanego posta)
+            if current_time not in scheduled_times:
+                available_slots.append({
+                    'datetime': current_time.isoformat(),
+                    'date': current_time.strftime('%Y-%m-%d'),
+                    'time': current_time.strftime('%H:%M'),
+                    'display': current_time.strftime('%d.%m.%Y %H:%M')
+                })
+            
+            # Przejdź do następnego slotu (30 minut później)
+            current_time += timedelta(minutes=30)
+            
+            # Zabezpieczenie przed nieskończoną pętlą
+            if current_time > base_date + timedelta(days=30):
+                break
+        
+        return jsonify({
+            'ok': True,
+            'available_slots': available_slots,
+            'count': len(available_slots),
+            'base_date': base_date.isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Błąd znajdowania dostępnych slotów: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
 # Dodatkowy endpoint: weryfikacja statusu publikacji po job_id (dokładny feedback per konto)
 @app.route('/api/publer/post-status', methods=['GET'])
 def api_publer_post_status():
@@ -2595,6 +2810,136 @@ def api_publer_post_status():
             **({'source': err_source} if err_source else {})
         }
         return jsonify(summary), 200 if published_flag else 502
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'Exception: {e}'}), 502
+
+
+# --- INTERNAL SCHEDULER API ENDPOINTS ---
+
+@app.route('/api/scheduler/schedule', methods=['POST'])
+def api_schedule_post():
+    """Planuje publikację posta w wewnętrznym schedulerze"""
+    try:
+        data = request.get_json() or {}
+        clip_id = data.get('clip_id')
+        scheduled_at = data.get('scheduled_at')
+        caption = data.get('caption', '')
+        accounts = data.get('accounts', [])
+        
+        if not clip_id:
+            return jsonify({'ok': False, 'error': 'Missing clip_id'}), 400
+        if not scheduled_at:
+            return jsonify({'ok': False, 'error': 'Missing scheduled_at'}), 400
+        
+        # Sprawdź czy plik exportu istnieje
+        filename = _export_filename_for(clip_id)
+        local_path = get_data_path('media', 'exports', filename)
+        if not os.path.exists(local_path):
+            return jsonify({'ok': False, 'error': f'Export not found: {filename}', 'hint': 'Run /api/render first'}), 404
+        
+        post_id = scheduler.schedule_post(clip_id, scheduled_at, caption, accounts)
+        
+        return jsonify({
+            'ok': True,
+            'post_id': post_id,
+            'message': 'Post zaplanowany pomyślnie'
+        })
+        
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'Exception: {e}'}), 502
+
+@app.route('/api/scheduler/posts', methods=['GET'])
+def api_get_scheduled_posts():
+    """Zwraca listę zaplanowanych postów"""
+    try:
+        post_type = request.args.get('type', 'scheduled')  # scheduled, published, failed
+        
+        if post_type == 'scheduled':
+            posts = scheduler.get_scheduled_posts()
+        elif post_type == 'published':
+            posts = scheduler.get_published_posts()
+        elif post_type == 'failed':
+            posts = scheduler.get_failed_posts()
+        else:
+            return jsonify({'ok': False, 'error': 'Invalid type. Use: scheduled, published, failed'}), 400
+        
+        return jsonify({
+            'ok': True,
+            'posts': posts,
+            'count': len(posts)
+        })
+        
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'Exception: {e}'}), 502
+
+@app.route('/api/scheduler/posts/<post_id>', methods=['DELETE'])
+def api_remove_scheduled_post(post_id: str):
+    """Usuwa zaplanowany post"""
+    try:
+        success = scheduler.remove_scheduled_post(post_id)
+        
+        if success:
+            return jsonify({
+                'ok': True,
+                'message': 'Post usunięty pomyślnie'
+            })
+        else:
+            return jsonify({'ok': False, 'error': 'Post nie został znaleziony'}), 404
+            
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'Exception: {e}'}), 502
+
+@app.route('/api/scheduler/status', methods=['GET'])
+def api_scheduler_status():
+    """Zwraca status schedulera"""
+    try:
+        status = scheduler.get_status()
+        return jsonify({
+            'ok': True,
+            'status': status
+        })
+        
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'Exception: {e}'}), 502
+
+@app.route('/api/scheduler/push-to-publer', methods=['POST'])
+def api_push_to_publer():
+    """Pushuje wszystkie zaplanowane posty do Publera jako backup"""
+    try:
+        result = scheduler.push_all_to_publer()
+        
+        return jsonify({
+            'ok': True,
+            'result': result,
+            'message': f'Przeniesiono {result["pushed"]} postów do Publera, {result["failed"]} błędów'
+        })
+        
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'Exception: {e}'}), 502
+
+@app.route('/api/scheduler/start', methods=['POST'])
+def api_start_scheduler():
+    """Uruchamia scheduler"""
+    try:
+        scheduler.start()
+        return jsonify({
+            'ok': True,
+            'message': 'Scheduler uruchomiony'
+        })
+        
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'Exception: {e}'}), 502
+
+@app.route('/api/scheduler/stop', methods=['POST'])
+def api_stop_scheduler():
+    """Zatrzymuje scheduler"""
+    try:
+        scheduler.stop()
+        return jsonify({
+            'ok': True,
+            'message': 'Scheduler zatrzymany'
+        })
+        
     except Exception as e:
         return jsonify({'ok': False, 'error': f'Exception: {e}'}), 502
 
@@ -2700,6 +3045,23 @@ def api_unlock_kick():
     except Exception:
         pass
     return _no_cache(jsonify({'ok': True, 'lock_removed': removed}))
+
+@app.route('/api/clip-data/<clip_id>')
+def api_get_clip_data(clip_id):
+    """Pobiera dane klipu (broadcaster, title) na podstawie clip_id"""
+    try:
+        clip_data = _get_clip_data_by_id(clip_id)
+        return jsonify({
+            'ok': True,
+            'clip_id': clip_id,
+            'broadcaster': clip_data.get('broadcaster'),
+            'title': clip_data.get('title')
+        })
+    except Exception as e:
+        return jsonify({
+            'ok': False,
+            'error': str(e)
+        }), 500
 
     
 
@@ -2817,6 +3179,18 @@ if __name__ == '__main__':
         except Exception:
             pass
 
+    # Uruchom wewnętrzny scheduler postów
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+        from scheduler import scheduler as post_scheduler
+        post_scheduler.start()
+        atexit.register(lambda: post_scheduler.stop())
+        print('[post-scheduler] started')
+    except Exception as e:
+        print(f'[post-scheduler] failed to start: {e}')
+
     # Upewnij się, że Werkzeg nie oczekuje WERKZEUG_SERVER_FD
     try:
         import os as _os
@@ -2825,6 +3199,192 @@ if __name__ == '__main__':
     except Exception:
         pass
 
-    app.run(host=host, port=port, debug=debug, use_reloader=False, threaded=True, use_debugger=False)
+# === INTERNAL SCHEDULER API ENDPOINTS ===
 
-    # Parametryzacja host/port/debug z ENV
+@app.route('/api/internal-scheduler/schedule', methods=['POST'])
+def api_internal_schedule_post():
+    """Zaplanuj nowy post w wewnętrznym schedulerze"""
+    try:
+        data = request.get_json()
+        
+        # Walidacja danych
+        required_fields = ['clip_id', 'scheduled_at', 'caption']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'Brak wymaganego pola: {field}'}), 400
+        
+        # Dodaj post do schedulera
+        post_id = scheduler.schedule_post(
+            clip_id=data['clip_id'],
+            scheduled_at=data['scheduled_at'],
+            caption=data['caption'],
+            accounts=data.get('accounts', [])
+        )
+        
+        return jsonify({
+            'success': True,
+            'post_id': post_id,
+            'message': 'Post zaplanowany pomyślnie'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/internal-scheduler/posts', methods=['GET'])
+def api_internal_get_scheduled_posts():
+    """Pobierz zaplanowane, opublikowane i nieudane posty"""
+    try:
+        status_filter = request.args.get('status', 'all')
+        
+        if status_filter == 'scheduled':
+            posts = scheduler.get_scheduled_posts()
+        elif status_filter == 'published':
+            posts = scheduler.get_published_posts()
+        elif status_filter == 'failed':
+            posts = scheduler.get_failed_posts()
+        else:
+            posts = {
+                'scheduled': scheduler.get_scheduled_posts(),
+                'published': scheduler.get_published_posts(),
+                'failed': scheduler.get_failed_posts()
+            }
+        
+        return jsonify({'success': True, 'posts': posts})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/internal-scheduler/posts/<post_id>', methods=['DELETE'])
+def api_internal_delete_scheduled_post(post_id):
+    """Usuń zaplanowany post"""
+    try:
+        success = scheduler.remove_scheduled_post(post_id)
+        
+        if success:
+            return jsonify({'success': True, 'message': 'Post usunięty'})
+        else:
+            return jsonify({'error': 'Post nie znaleziony'}), 404
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/internal-scheduler/posts/<post_id>', methods=['PUT'])
+def api_internal_update_scheduled_post(post_id):
+    """Zaktualizuj zaplanowany post"""
+    try:
+        data = request.get_json()
+        success = scheduler.update_scheduled_post(post_id, data)
+        
+        if success:
+            return jsonify({'success': True, 'message': 'Post zaktualizowany'})
+        else:
+            return jsonify({'error': 'Post nie znaleziony'}), 404
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/internal-scheduler/status', methods=['GET'])
+def api_internal_scheduler_status():
+    """Sprawdź status schedulera"""
+    try:
+        status = scheduler.get_status()
+        return jsonify({'success': True, 'status': status})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/internal-scheduler/push-to-publer', methods=['POST'])
+def api_internal_push_to_publer():
+    """Przenieś wszystkie zaplanowane posty do Publera"""
+    try:
+        result = scheduler.push_all_to_publer()
+        return jsonify({
+            'success': True,
+            'result': result,
+            'message': f'Przeniesiono {result["pushed"]} postów do Publera'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/internal-scheduler/push-to-publer/<clip_id>', methods=['POST'])
+def api_internal_push_clip_to_publer(clip_id):
+    """Przenieś konkretny post do Publera"""
+    try:
+        # Znajdź post o danym clip_id
+        scheduled_posts = scheduler.get_scheduled_posts()
+        post_to_push = None
+        
+        for post in scheduled_posts:
+            if post.get('clip_id') == clip_id:
+                post_to_push = post
+                break
+        
+        if not post_to_push:
+            return jsonify({'error': f'Nie znaleziono zaplanowanego posta dla clip_id: {clip_id}'}), 404
+        
+        # Przenieś post do Publera (implementacja zależy od schedulera)
+        result = scheduler.push_post_to_publer(post_to_push['id'])
+        
+        return jsonify({
+            'success': True,
+            'message': f'Post {clip_id} przeniesiony do Publera'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/internal-scheduler/push-to-publer/post/<post_id>', methods=['POST'])
+def api_internal_push_post_to_publer(post_id):
+    """Przenieś konkretny post do Publera używając post_id"""
+    try:
+        # Przenieś post do Publera
+        result = scheduler.push_post_to_publer(post_id)
+        
+        if result:
+            return jsonify({
+                'success': True,
+                'message': f'Post {post_id} przeniesiony do Publera'
+            })
+        else:
+            return jsonify({'error': f'Nie znaleziono posta {post_id} lub błąd przesyłania'}), 404
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/internal-scheduler/start', methods=['POST'])
+def api_internal_start_scheduler():
+    """Uruchom scheduler"""
+    try:
+        scheduler.start()
+        return jsonify({'success': True, 'message': 'Scheduler uruchomiony'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/internal-scheduler/stop', methods=['POST'])
+def api_internal_stop_scheduler():
+    """Zatrzymaj scheduler"""
+    try:
+        scheduler.stop()
+        return jsonify({'success': True, 'message': 'Scheduler zatrzymany'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/internal-scheduler/reset-failed', methods=['POST'])
+def api_internal_reset_failed_posts():
+    """Resetuj posty z failed do scheduled"""
+    try:
+        reset_count = scheduler.reset_failed_posts()
+        return jsonify({
+            'success': True, 
+            'message': f'Zresetowano {reset_count} postów z failed do scheduled',
+            'reset_count': reset_count
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(host=host, port=port, debug=debug, use_reloader=False, threaded=True, use_debugger=False)
