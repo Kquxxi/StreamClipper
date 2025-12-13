@@ -2,11 +2,56 @@
 
 ## Opis aplikacji
 
-- End‑to‑end narzędzie do pobierania, selekcji, transkrypcji, kadrowania (crop), renderowania i publikacji krótkich klipów z Twitch i Kick.
-- Udostępnia interfejs webowy (`/editor`) do pracy z klipami oraz rozbudowane API do raportów i automatyzacji.
-- Generuje raporty popularnych klipów/streamerów (Twitch/Kick), pozwala oznaczać preferencje streamerów i filtrować wyniki.
-- Integruje się z Publer (API) w celu publikacji/schedulingu postów, dodatkowo posiada wewnętrzny lokalny scheduler, który utrzymuje kolejkę w plikach JSON.
-- Przechowuje dane użytkownika i artefakty render/transkrypcji lokalnie (JSON + `media/**`), a repozytorium ignoruje je zgodnie z `.gitignore`.
+- Aplikacja do pełnego procesu pracy z klipami: pobieranie z Twitch/Kick, selekcja, transkrypcja, kadrowanie (crop), renderowanie i publikacja.
+- Udostępnia interfejs webowy (`/editor`) oraz API do raportów i automatyzacji.
+- Tworzy raporty popularnych klipów i streamerów (Twitch/Kick), wspiera preferencje (`streamers_prefs.json`) i filtrowanie.
+- Integracja z Publer (API) umożliwia publikację/schedulowanie postów; lokalny scheduler utrzymuje kolejkę w `scheduled_posts.json`.
+- Dane użytkownika i artefakty (cache, media, transkrypcje) są przechowywane lokalnie i ignorowane przez Git zgodnie z `.gitignore`.
+
+## Dlaczego i dla kogo
+
+- Dla twórców i operatorów kanałów, którzy chcą automatyzować tworzenie krótkich form z materiałów Twitch/Kick.
+- Redukuje czas ręcznej pracy: od znalezienia klipu, przez transkrypcję i render, po publikację.
+- Minimalizuje ryzyko wycieku danych: sekrety i pliki wrażliwe są w `.env`/lokalnym storage, a repo trzyma tylko kod i przykłady.
+
+## Najważniejsze funkcje
+
+- Pobieranie i raporty: skanowanie Twitch/Kick, generacja raportów z filtrowaniem i preferencjami.
+- Selekcja w UI: wybór klipów, edycja metadanych, zapis do `selection.json`.
+- Transkrypcja i crop: uruchomienie pipeline (WhisperX), definicja kadrowania do pionowych formatów.
+- Render i media: eksporty wideo, serwowanie `previews/exports/subtitles` przez API.
+- Publikacja: integracja z Publer (upload/schedule) + wewnętrzny lokalny scheduler.
+- Automatyzacja: endpointy statusów, kolejki i zadań; opcjonalne wystawienie przez Cloudflared.
+
+## Architektura (wysoki poziom)
+
+- Warstwa web (Flask): serwuje UI (`/editor`) i API (raporty, transkrypcja, render, publikacja).
+- Warstwa zadań: wewnętrzny scheduler (lokalne JSON) oraz integracje z Publer.
+- Integracje zewnętrzne: Twitch API (`twitchAPI`), Kick (`KickApi`/cookies), Publer (REST), Cloudflared (tunel).
+- Persistencja: lekkie pliki JSON i katalog `media/**`; repo ignoruje generatywne artefakty.
+
+## Główne przepływy
+
+- Od klipu do posta:
+  1. Wybór klipu w `/editor` i zapis selekcji.
+  2. Pobranie źródeł i prewek (`/api/ensure-cache`).
+  3. Transkrypcja (`/api/transcribe`) i ewentualny crop (`/api/crop`).
+  4. Render (`/api/render`) → eksport wideo.
+  5. Publikacja (`/publish/<clip_id>`) lub zaplanowanie przez scheduler.
+
+- Raport Twitch/Kick:
+  1. Generacja danych raportu z filtrami i ograniczeniami z ENV.
+  2. Prezentacja w UI (tabela jednolita, szybkie filtrowanie).
+  3. Opcjonalne oznaczenia preferowanych/pomijanych streamerów.
+
+## Integracje i zależności
+
+- Twitch: `twitchAPI` + `requests` (limity, okna czasowe i filtry konfigurowalne w ENV).
+- Kick: `KickApi` lub cookies (z pliku lub przeglądarki), opcjonalny `KICK_USER_AGENT`.
+- Publer: klucze API/workspace/konta z ENV, tryb „dry‑run” przy braku kluczy.
+- Transkrypcja: WhisperX przez adapter (`pipeline/transcribe`), sterowana parametrami ENV.
+- Media: `yt-dlp`, `imageio-ffmpeg` do pobierania i prewek.
+- Tunel: Cloudflared do wystawienia lokalnego serwera.
 
 ## Architektura i przepływ działania
 
@@ -74,6 +119,7 @@ $env:PORT = "5001"; $env:DEBUG = "false"; python -u app\main.py
 - Nie commituj realnych wartości sekretów do repozytorium – używaj `.env`.
 - Cookies Kick są traktowane jako wrażliwe; wzorce `*cookies*.txt` są ignorowane przez `.gitignore`.
 - Pliki cache/backup/raporty generowane w runtime są ignorowane zgodnie z `.gitignore`.
+- Dane użytkownika (selekcje, kolejka publikacji) pozostają lokalnie; repozytorium trzyma tylko kod i przykłady.
 
 ## Endpoints
 
@@ -134,3 +180,15 @@ Wskazówki:
 - `transcribe/*.json`, `transcribe/*.srt` – wyniki transkrypcji; ignorowane.
 - `locks/` – pliki blokad schedulera; ignorowane.
 - `*.tmp`, `*TEMP_MPY*` – pliki tymczasowe (np. MoviePy); ignorowane.
+
+## Proponowana nazwa aplikacji
+
+- Aktualna nazwa: `e2eClipUploader`.
+- Rekomendacje (z krótką motywacją):
+  - `ClipFlow` / `KlipyFlow` – podkreśla płynny przepływ od klipu do publikacji (E2E pipeline).
+  - `ClipPilot` / `KlipyPilot` – „pilot” prowadzący przez selekcję, render i publikację.
+  - `ClipForge` / `KlipyForge` – akcent na „obrabianie” i składanie klipów.
+  - `StreamClipper` – jasne skojarzenie ze streamami i cięciem klipów.
+  - `ClipCaster` – wydźwięk nadawania/emitowania gotowych materiałów.
+
+Sugeruję `ClipFlow` (polska wersja: `KlipyFlow`) – jest zwięzła, neutralna, dobrze oddaje przepływ pracy i skalę funkcji.
