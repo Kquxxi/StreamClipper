@@ -1,4 +1,4 @@
-# e2eClipUploader
+# StreamClipper
 
 ## Environment Setup (.env)
 
