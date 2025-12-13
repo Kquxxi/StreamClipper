@@ -1,0 +1,10 @@
+# GitHub Linguist configuration to make language stats reflect core code
+
+# Treat HTML templates as documentation (excluded from language statistics)
+templates/*.html linguist-documentation
+template.html linguist-documentation
+kick/template_kick.html linguist-documentation
+
+# Optional: exclude static assets from stats (keep languages focused on code)
+static/*.css linguist-vendored
+static/*.js linguist-vendored
