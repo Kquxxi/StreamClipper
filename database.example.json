@@ -1,0 +1,7 @@
+{
+  "database": [
+    { "id": "12345678", "login": "example_streamer_1", "display_name": "ExampleStreamer1", "followers": 12345 },
+    { "id": "23456789", "login": "example_streamer_2", "display_name": "ExampleStreamer2", "followers": 67890 },
+    { "id": "34567890", "login": "example_streamer_3", "display_name": "ExampleStreamer3", "followers": 1112 }
+  ]
+}

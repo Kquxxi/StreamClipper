@@ -9,3 +9,7 @@ requests==2.31.0
 # jeśli w main.py lub update_streamers.py czytasz .env
 python-dotenv==1.0.0
 KickApi==0.3.5
+
+# Pobieranie i generowanie prewek
+yt-dlp
+imageio-ffmpeg

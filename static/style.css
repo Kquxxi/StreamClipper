@@ -1,17 +1,32 @@
 :root {
-  --primary: #556cd6;
-  --primary-dark: #3f51b5;
-  --bg: #f9f9fb;
-  --text: #333;
-  --border: #ddd;
-  --radius: 6px;
-  --tableHeight: 520px; /* wspólna wysokość kontenera tabeli Twitch/Kick */
+  /* Bazowa paleta: jaśniejszy dark mode */
+  --primary: #4aa3ff;           /* niebieski akcent — jaśniejszy */
+  --primary-dark: #2e7ed6;      /* hover/active */
+  --bg: #171b22;                 /* było #121212 → odrobinę jaśniej */
+  --text: #d7dee8;               /* było #cbd5e1 → czytelniej */
+  --border: #343b48;             /* było #2a2e38 → jaśniej */
+  --radius: 8px;                 /* delikatnie bardziej „soft” */
+  --tableHeight: 520px;          /* wspólna wysokość kontenera tabeli Twitch/Kick */
+  --panel-bg: #232833;           /* było #1a1b1f → jaśniej i cieplej */
+
+  /* Rozszerzone akcenty kolorystyczne */
+  --accent-blue: #4aa3ff;
+  --accent-purple: #9d7dff;
+  --accent-green: #3ccf8e;
+  --accent-amber: #f2b94b;
+  --accent-red: #ff6b6b;
+  --accent-cyan: #54d3ce;
+  --accent-pink: #ff8fd1;
+
+  /* Teksty pomocnicze */
+  --text-secondary: #aab3c0;
+  --text-muted: #8b93a1;
 }
 
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: "Segoe UI", Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   margin: 0;
   padding: 0;
 }
@@ -37,26 +52,29 @@ header {
   align-items: center;
   gap: 12px;
   padding: 8px 10px;
-  background: #f6f7fb;
-  border: 1px solid #dde1f3;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
 }
 .subactions .hint {
-  color: #4a4f61;
+  color: #b0b0b0;
   font-size: 0.95rem;
 }
 
 .btn {
-  background: var(--primary);
-  color: #fff;
-  border: none;
+  background: #2a2e38;
+  color: #d6dee6; /* był #f0f0f0 → nie-biały, bardziej miękki kontrast */
+  border: 1px solid #3a3f4b;
   padding: 0.5rem 1rem;
   margin: 0 0.25rem;
   border-radius: var(--radius);
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s, border-color 0.2s, transform 0.1s;
 }
-.btn:hover { background: var(--primary-dark); }
+.btn:hover {
+  background: #343946;
+  border-color: #4b5160;
+}
 
 /* Zapewnij spójny rozmiar dla linków z klasą .btn jak dla <button> */
 a.btn {
@@ -105,7 +123,7 @@ a.btn {
   line-height: 1; 
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   border-radius: 3px;
   box-sizing: border-box;
   background: transparent !important;
@@ -182,7 +200,7 @@ a.btn {
 .progress-bar {
   position: relative;
   height: 8px;
-  background: #eee;
+  background: #1f232b; /* ciemny tor, zamiast jasnego #eee */
   border-radius: 4px;
   overflow: hidden;
 }
@@ -198,9 +216,8 @@ a.btn {
   animation: pulse-bg 1.2s ease-out 1;
 }
 .new-unviewed {
-  background: #fffef5;
-  /* Mały żółty pasek po lewej stronie dla nowych klipów */
-  box-shadow: inset 6px 0 0 #ffeb3b;
+  background: rgba(255, 193, 7, 0.08); /* delikatny bursztynowy akcent na ciemnym tle */
+  box-shadow: inset 6px 0 0 #ffb300; /* cieplejszy żółty pasek */
 }
 .viewed-row {
   opacity: 0.65;
@@ -226,7 +243,8 @@ a.btn {
   width: 100%;
   text-align: left;
   padding: 0.5rem;
-  background: #fff;
+  background: var(--panel-bg);
+  color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   cursor: pointer;
@@ -238,10 +256,11 @@ a.btn {
   width: 100%;
   max-height: 200px;
   overflow-y: auto;
-  background: #fff;
+  background: var(--panel-bg);
+  color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
   display: none;
   z-index: 10;
 }
@@ -289,7 +308,7 @@ a.btn {
 }
 #report-table th {
   background: var(--primary);
-  color: #fff;
+  color: #e8edf3; /* niebiały, kontrastowy tekst */
   position: sticky;
   top: 0;
   text-align: left;
@@ -325,7 +344,7 @@ a.btn {
   overflow: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--panel-bg);
 }
 
 /* Twitch/Kick: ustalona wysokość wierszy tabeli (~22.4px total)
@@ -354,11 +373,26 @@ a.btn {
   z-index: 9998;
   display: flex;
   gap: 10px;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
   padding: 10px;
-  background: rgba(246, 247, 251, 0.95);
-  border-top: 1px solid #dde1f3;
+  background: rgba(20,20,24,0.95);
+  border-top: 1px solid #333;
+}
+.fixed-editor-bar .feb-left,
+.fixed-editor-bar .feb-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* Ujednolicenie rozmiaru przycisków na pasku edytora */
+.fixed-editor-bar .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px; /* spójny rozmiar */
+  font-size: 14px;
+  line-height: 1; /* spójna wysokość z paddingiem */
 }
 /* FAB: Dalej do edytora w prawym dolnym rogu */
 .fab-proceed {
@@ -408,8 +442,8 @@ a.btn {
   align-items: center;
   margin-bottom: 20px;
   padding: 15px;
-  background: #f6f7fb;
-  border: 1px solid #dde1f3;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
 }
 
@@ -455,8 +489,9 @@ a.btn {
   gap: 20px;
   margin-bottom: 15px;
   padding: 10px 15px;
-  background: #fff;
-  border: 1px solid #dde1f3;
+  background: var(--panel-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
 }
 
@@ -469,8 +504,8 @@ a.btn {
 }
 
 .calendar-content {
-  background: #fff;
-  border: 1px solid #dde1f3;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   min-height: 400px;
 }
@@ -479,37 +514,14 @@ a.btn {
   display: flex;
   align-items: center;
   padding: 12px 15px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border);
   transition: background-color 0.2s;
 }
-
 .calendar-post:hover {
-  background-color: #f8f9fa;
+  background-color: rgba(255,255,255,0.04);
 }
-
-.calendar-post:last-child {
-  border-bottom: none;
-}
-
-.calendar-post-checkbox {
-  margin-right: 12px;
-}
-
-.calendar-post-info {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 1fr 150px 100px 120px;
-  gap: 15px;
-  align-items: center;
-}
-
-.calendar-post-title {
-  font-weight: 500;
-  color: var(--text);
-}
-
 .calendar-post-date {
-  color: #666;
+  color: #b0b0b0;
   font-size: 14px;
 }
 
@@ -522,18 +534,18 @@ a.btn {
 }
 
 .status-scheduled {
-  background: #e3f2fd;
-  color: #1976d2;
+  background: rgba(52, 152, 219, 0.14); /* ciemny niebieski akcent */
+  color: #7fc4ff;
 }
 
 .status-published {
-  background: #e8f5e8;
-  color: #2e7d32;
+  background: rgba(46, 125, 50, 0.16); /* ciemny zielony akcent */
+  color: #8be29a;
 }
 
 .status-failed {
-  background: #ffebee;
-  color: #c62828;
+  background: rgba(198, 40, 40, 0.16); /* ciemny czerwony akcent */
+  color: #ff8a80;
 }
 
 .calendar-post-actions {
@@ -543,7 +555,7 @@ a.btn {
 
 .btn-primary {
   background: #2e7d32;
-  color: white;
+  color: #e8edf3; /* niebiały tekst */
 }
 
 .btn-primary:hover {
@@ -551,7 +563,8 @@ a.btn {
 }
 
 .btn-primary:disabled {
-  background: #ccc;
+  background: #3a3f4b; /* ciemny, zamiast jasnego #ccc */
+  color: #8a9099;
   cursor: not-allowed;
 }
 
@@ -568,8 +581,8 @@ a.btn {
   gap: 20px;
   margin-bottom: 20px;
   padding: 15px;
-  background: #f6f7fb;
-  border: 1px solid #dde1f3;
+  background: var(--panel-bg); /* było #f6f7fb */
+  border: 1px solid var(--border); /* było #dde1f3 */
   border-radius: var(--radius);
 }
 
@@ -606,7 +619,7 @@ a.btn {
 /* Danger button styles */
 .btn-danger {
   background: #dc3545;
-  color: white;
+  color: #e8edf3; /* niebiały tekst */
 }
 
 .btn-danger:hover {

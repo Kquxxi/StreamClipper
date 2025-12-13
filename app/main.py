@@ -29,6 +29,12 @@ app = Flask(
     static_folder='../static',
     template_folder='../templates'
 )
+# Dev: auto-reload szablonów i brak cache statycznych w dev
+try:
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+except Exception:
+    pass
 
 # --- load env (supports both config.env and .env) ---
 load_dotenv()  # prefer .env
@@ -779,7 +785,7 @@ def api_remove_rendered_clip():
 def editor():
     sel = _safe_read_json(get_data_path('selection.json'), default={'clips': []})
     clips = sel.get('clips', [])
-    resp = make_response(render_template('editor.html', clips=clips))
+    resp = make_response(render_template('editor.html', clips=clips, cache_buster=int(time.time())))
     try:
         resp.headers['Cache-Control'] = 'no-store'
         resp.headers['Pragma'] = 'no-cache'
@@ -1169,13 +1175,20 @@ def _send_file_partial(path: str):
     rv.headers['X-Robots-Tag'] = 'noindex, nofollow'
     return rv
 
-# NEW: serve rendered exports
-@app.route('/media/exports/<path:name>')
+# NEW: serve rendered exports (with Range support)
+@app.route('/media/exports/<path:name>', methods=['GET','HEAD'])
 def serve_export(name: str):
     path = get_data_path('media', 'exports', name)
     if not os.path.exists(path):
-        return jsonify({'error': 'Not Found'}), 404
-    return send_file(path)
+        resp = jsonify({'error': 'Not Found'})
+        resp.status_code = 404
+        try:
+            resp.headers['Cache-Control'] = 'no-store'
+            resp.headers['X-Robots-Tag'] = 'noindex, nofollow'
+        except Exception:
+            pass
+        return resp
+    return _send_file_partial(path)
 
 # NEW: serve subtitles (SRT)
 @app.route('/media/subtitles/<path:name>')
@@ -2611,7 +2624,19 @@ def api_publish_publer(clip_id: str):
                 **({'source': err_source} if err_source else {})
             }
             _write_publish_log_publer(clip_id, {'summary': summary}, None, 'publish_summary')
+            try:
+                # Zaloguj publikację do wewnętrznego timeline'u (dla publish_now)
+                if publish_now:
+                    scheduler.add_published_post(clip_id, caption, account_ids, scheduled_at if scheduled_at else None)
+            except Exception:
+                pass
             return jsonify(summary)
+        try:
+            # Zaloguj publikację do wewnętrznego timeline'u (dla publish_now)
+            if publish_now:
+                scheduler.add_published_post(clip_id, caption, account_ids, scheduled_at if scheduled_at else None)
+        except Exception:
+            pass
         return jsonify({'ok': True, 'published': True, 'response': res_json})
     except Exception as e:
         _write_publish_log_publer(clip_id, post_payload, {'exception': str(e)}, 'publish_exception')
@@ -3158,8 +3183,8 @@ if __name__ == '__main__':
     except ValueError:
         port = 5001
     host = os.getenv('HOST', '127.0.0.1')
-    # Wymuszamy debug False
-    debug = False
+    # Debug sterowany przez ENV (domyślnie włączony dla dev)
+    debug = str(os.getenv('DEBUG', 'true')).lower() in ('1','true','yes','on')
 
     # Kontrola uruchamiania harmonogramu przez ENV (domyślnie wyłączony)
     should_start_scheduler = str(os.getenv('ENABLE_SCHEDULER', 'false')).lower() in ('1','true','yes','on')
@@ -3192,12 +3217,6 @@ if __name__ == '__main__':
         print(f'[post-scheduler] failed to start: {e}')
 
     # Upewnij się, że Werkzeg nie oczekuje WERKZEUG_SERVER_FD
-    try:
-        import os as _os
-        _os.environ.pop('WERKZEUG_SERVER_FD', None)
-        _os.environ.pop('WERKZEUG_RUN_MAIN', None)
-    except Exception:
-        pass
 
 # === INTERNAL SCHEDULER API ENDPOINTS ===
 
@@ -3239,10 +3258,18 @@ def api_internal_get_scheduled_posts():
         if status_filter == 'scheduled':
             posts = scheduler.get_scheduled_posts()
         elif status_filter == 'published':
+            try:
+                scheduler.clean_published_older_than(48)
+            except Exception:
+                pass
             posts = scheduler.get_published_posts()
         elif status_filter == 'failed':
             posts = scheduler.get_failed_posts()
         else:
+            try:
+                scheduler.clean_published_older_than(48)
+            except Exception:
+                pass
             posts = {
                 'scheduled': scheduler.get_scheduled_posts(),
                 'published': scheduler.get_published_posts(),
@@ -3307,6 +3334,27 @@ def api_internal_push_to_publer():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/internal-scheduler/reset-failed', methods=['POST'])
+def api_internal_reset_failed():
+    """Resetuje wszystkie nieudane posty do scheduled, zeruje retry_count."""
+    try:
+        count = scheduler.reset_failed_posts()
+        return jsonify({'success': True, 'reset': count, 'message': f'Zresetowano {count} postów z failed do scheduled'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/internal-scheduler/retry-failed/<post_id>', methods=['POST'])
+def api_internal_retry_failed_post(post_id):
+    """Ręczne ponowienie publikacji nieudanego posta."""
+    try:
+        success = scheduler.retry_failed_post(post_id)
+        if success:
+            return jsonify({'success': True, 'message': f'Post {post_id} opublikowany po ponowieniu'})
+        else:
+            return jsonify({'success': False, 'error': 'Ponowienie nie powiodło się lub post nie znaleziony'}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/internal-scheduler/push-to-publer/<clip_id>', methods=['POST'])
 def api_internal_push_clip_to_publer(clip_id):
     """Przenieś konkretny post do Publera"""
@@ -3338,19 +3386,31 @@ def api_internal_push_clip_to_publer(clip_id):
 def api_internal_push_post_to_publer(post_id):
     """Przenieś konkretny post do Publera używając post_id"""
     try:
-        # Przenieś post do Publera
-        result = scheduler.push_post_to_publer(post_id)
+        # Przenieś post do Publera (planowany w Publerze)
+        result = scheduler.push_post_to_publer(post_id, publish_now=False)
         
         if result:
             return jsonify({
                 'success': True,
-                'message': f'Post {post_id} przeniesiony do Publera'
+                'message': f'Post {post_id} przeniesiony do Publera (scheduled)'
             })
         else:
             return jsonify({'error': f'Nie znaleziono posta {post_id} lub błąd przesyłania'}), 404
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/internal-scheduler/push-now-to-publer/post/<post_id>', methods=['POST'])
+def api_internal_push_now_post_to_publer(post_id):
+    """Przenieś konkretny post do Publera jako publish_now (natychmiast)."""
+    try:
+        result = scheduler.push_post_to_publer(post_id, publish_now=True)
+        if result:
+            return jsonify({'success': True, 'message': f'Post {post_id} przeniesiony do Publera (publish_now)'}), 200
+        else:
+            return jsonify({'success': False, 'error': f'Nie znaleziono posta {post_id} lub błąd przesyłania'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/internal-scheduler/start', methods=['POST'])
 def api_internal_start_scheduler():
@@ -3386,5 +3446,20 @@ def api_internal_reset_failed_posts():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/internal-scheduler/clean-published', methods=['POST'])
+def api_internal_clean_published():
+    """Usuń opublikowane posty starsze niż `hours` (domyślnie 48)."""
+    try:
+        hours = int(request.args.get('hours', '48'))
+        cleaned = scheduler.clean_published_older_than(hours)
+        return jsonify({
+            'success': True,
+            'message': f'Usunięto {cleaned} opublikowanych postów starszych niż {hours}h',
+            'cleaned': cleaned,
+            'hours': hours
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 if __name__ == '__main__':
-    app.run(host=host, port=port, debug=debug, use_reloader=False, threaded=True, use_debugger=False)
+    app.run(host=host, port=port, debug=debug, use_reloader=debug, threaded=True, use_debugger=debug)

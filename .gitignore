@@ -4,6 +4,9 @@ config.env
 .env.*
 *.env
 
+# Cookies (browser/session dumps)
+*cookies*.txt
+
 # Python bytecode and cache
 __pycache__/
 *.py[cod]
@@ -46,6 +49,11 @@ htmlcov/
 Thumbs.db
 desktop.ini
 
+# Temporary files
+*.tmp
+# MoviePy temporary outputs (e.g., tmpTEMP_MPY_wvf_snd.mp4)
+*TEMP_MPY*
+
 # Logs
 *.log
 logs/
@@ -56,6 +64,7 @@ media/clips/
 media/exports/
 media/previews/
 media/subtitles/
+render/
 
 # Transcription pipeline outputs
 pipeline/transcribe/output/
@@ -67,9 +76,28 @@ raport.html
 raport_data.json
 kick/raport_kick.html
 kick/raport_kick_data.json
+kick/raport_kick_data.json.bak_*
+reports/**
+kick/progress.json
+scheduled_posts.json
+scheduled_posts.json.backup_*
 
 # Databases and caches (runtime/generated)
 ensure_cache_progress.json
+kick/kick_clips_cache*.json
+database_backup_*.json
+selection_backup_*.json
+# Local test data files (not versioned)
+database_test.json
+*_test.json
+test_*.json
+# Generic backup files (including nested backup chains)
+*.bak
+*.bak_*
+*_backup_*.*
+selection.json
+locks/
+*.lock
 
 
 # App-specific generated data

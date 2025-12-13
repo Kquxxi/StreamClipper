@@ -1,0 +1,16 @@
+# Przykładowa konfiguracja Cloudflared (kopiuj do config.yml po uzupełnieniu).
+# Nie zawiera sekretów – realne wartości (tunnel UUID/credentials) trzymaj poza repo.
+
+# Identyfikator tunelu lub jego nazwa (po `cloudflared tunnel create <name>`)
+tunnel: "<YOUR_TUNNEL_UUID_OR_NAME>"
+
+# Plik z poświadczeniami tunelu – generowany przez cloudflared, trzymaj poza repo
+credentials-file: "C:\\ProgramData\\Cloudflare\\<UUID>.json"
+
+# Mapowanie ruchu z hosta publicznego na lokalny serwer
+ingress:
+  - hostname: <twoj-subdomen.cloudflaretunnel.com>
+    service: http://127.0.0.1:5001
+  - service: http_status:404
+
+# Po uruchomieniu tunelu ustaw `PUBLIC_BASE_URL` w .env na publiczny URL (bez końcowego "/").

@@ -11,6 +11,168 @@
     .dropdown-container.open .dropdown-menu {
       display: block !important;
     }
+
+    /* Terminarz: karty klipów (bez gradientów, układ grid) */
+    .calendar-content {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .calendar-post {
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #1c1f26; /* usunięty gradient */
+      border: 1px solid #2a2d34;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+      min-height: 88px;
+      transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+      cursor: pointer;
+    }
+    .calendar-post:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 22px rgba(0,0,0,0.45);
+      border-color: #3a3f48;
+    }
+
+    .calendar-post-info {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      column-gap: 12px;
+      row-gap: 6px;
+      align-items: start;
+    }
+
+    /* Tytuł: jedna linia, skrócenie, spójna typografia */
+    .calendar-post-title {
+      grid-column: 1 / 2;
+      grid-row: 1 / 2;
+      font-size: 14px;
+      font-weight: 600;
+      color: #e5e7eb;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .calendar-post-date {
+      grid-column: 1 / 2;
+      grid-row: 2 / 3;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    /* Statusy: badge bez gradientów */
+    .calendar-post-status {
+      grid-column: 2 / 3;
+      grid-row: 1 / 2;
+      justify-self: end;
+      align-self: start;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .02em;
+      color: #0f172a;
+      background: #e5e7eb; /* baza bez gradientu */
+    }
+    .status-scheduled { background: #34d399; color: #052e1f; }
+    .status-published { background: #10b981; color: #06372c; }
+    .status-failed { background: #ef4444; color: #3b0d0d; }
+
+    .calendar-post-actions {
+      grid-column: 2 / 3;
+      grid-row: 2 / 3;
+      justify-self: end;
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .calendar-post-actions .btn {
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1;
+    }
+    .calendar-post-actions .btn-danger {
+      background: #b91c1c; /* bez gradientu */
+      color: #fff;
+      border: 1px solid #7f1d1d;
+      box-shadow: 0 2px 8px rgba(239,68,68,.35);
+    }
+    .calendar-post-actions .btn-primary {
+      background: #2563eb; /* bez gradientu */
+      color: #fff;
+      border: 1px solid #1d4ed8;
+      box-shadow: 0 2px 8px rgba(37,99,235,.35);
+    }
+    .calendar-post-actions .btn-warning {
+      background: #f59e0b; /* bez gradientu */
+      color: #0b0b0b;
+      border: 1px solid #b45309;
+      box-shadow: 0 2px 8px rgba(245,158,11,.35);
+    }
+    .calendar-post-actions .btn:hover { filter: brightness(1.06); }
+    .calendar-post-actions .btn:active { transform: translateY(1px); }
+
+    /* Checkbox: płaski, bez gradientu */
+    .calendar-post-checkbox,
+    .calendar-filters input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      background: #2b2e36; /* bez gradientu */
+      border: 2px solid #4b5563;
+      position: relative;
+      transition: all .12s ease;
+      cursor: pointer;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,.4);
+    }
+    .calendar-post-checkbox:hover,
+    .calendar-filters input[type="checkbox"]:hover { border-color: #6b7280; }
+    .calendar-post-checkbox:checked,
+    .calendar-filters input[type="checkbox"]:checked {
+      border-color: #34d399;
+      background: #1e3a2f; /* ciemna zieleń, bez gradientu */
+    }
+    .calendar-post-checkbox:checked::after,
+    .calendar-filters input[type="checkbox"]:checked::after {
+      content: "";
+      position: absolute;
+      width: 6px; height: 10px;
+      border-right: 2px solid #fff;
+      border-bottom: 2px solid #fff;
+      transform: rotate(45deg);
+      left: 5px; top: 1px;
+    }
+
+    /* Filtry terminarza: wygląd jak wcześniej, bez gradientu */
+    .calendar-filters {
+      display: inline-flex;
+      gap: 14px;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: #1f232b; /* bez gradientu */
+      border: 1px solid #2b2f38;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+      margin: 10px 0 14px;
+    }
+    .calendar-filters label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #e5e7eb;
+      font-size: 13px;
+      font-weight: 600;
+      user-select: none;
+    }
   </style>
 </head>
 <body>
@@ -18,10 +180,7 @@
     <header>
       <h1>Panel Twitch Clips</h1>
       <div class="actions">
-        <button id="btn-update" class="btn">Odśwież streamerów twitch</button>
-        <button id="btn-report" class="btn">Generuj raport Twitch</button>
-        <button id="btn-kick" class="btn">Generuj raport Kick</button>
-        <button id="btn-calendar" class="btn">📅 Terminarz</button>
+        <!-- Przeniesiono przycisk Terminarza do stałego paska edytora -->
         <a href="/admin" id="admin-link" class="btn" title="Preferencje streamerów">⚙️ Panel admina</a>
         <span id="spinner" style="display:none;margin-left:8px;">⏳</span>
       </div>
@@ -58,8 +217,13 @@
 
     <!-- Globalny pasek edytora: zawsze widoczny niezależnie od raportu -->
     <div id="global-editor-fixedbar" class="fixed-editor-bar" style="display:flex;">
-      <button id="proceed-editor-fixed" class="btn" disabled>➡️ Dalej do edytora</button>
-      <button id="view-saved-fixed" class="btn">👁️ Pokaż zapisane</button>
+      <div class="feb-left">
+        <button id="btn-calendar" class="btn">📅 Terminarz</button>
+      </div>
+      <div class="feb-right">
+        <button id="view-saved-fixed" class="btn">👁️ Pokaż zapisane</button>
+        <button id="proceed-editor-fixed" class="btn" disabled>➡️ Dalej do edytora</button>
+      </div>
     </div>
 
     <main>
@@ -83,6 +247,7 @@
               <button id="btn-deselect-all" class="btn">Odznacz wszystkie</button>
               <button id="btn-push-selected" class="btn btn-primary" disabled>🚀 Push do Publera</button>
               <button id="btn-refresh-calendar" class="btn">🔄 Odśwież</button>
+              <button id="btn-reset-failed" class="btn btn-danger">♻️ Resetuj nieudane</button>
             </div>
           </div>
           
@@ -103,11 +268,7 @@
           </div>
         </section>
       </div>
-<!-- Stały pasek edytora na dole: dwa przyciski główne -->
-<div id="fallback-editor-controls" style="position:fixed; left:0; right:0; bottom:0; display:flex; gap:8px; padding:8px; background:rgba(20,20,24,0.9); border-top:1px solid #333; justify-content:center; z-index:1000;">
-  <button id="fallback-proceed-editor" class="btn" title="Przejdź do edytora z zapisanymi">➕ Dodaj do edytora</button>
-  <button id="fallback-view-saved" class="btn" title="Pokaż/Ukryj zapisane">📌 Pokaż zapisane</button>
-</div>
+
 <!-- Overlay zapisanych klipów -->
 <div id="saved-clips-panel" style="display:none; position:fixed; right:12px; bottom:56px; width:360px; max-height:50vh; overflow:auto; background:#15161a; border:1px solid #333; border-radius:6px; box-shadow:0 8px 24px rgba(0,0,0,0.4); padding:10px; z-index:999;"></div>
     </main>
@@ -511,26 +672,29 @@
       finally { statusFetchLock = false; }
     }
 
-    document.getElementById('btn-kick').onclick = async () => {
-      if (btnKick.disabled) return;
-      btnKick.disabled = true;
-      const prevTxt = btnKick.textContent;
-      btnKick.textContent = 'Generuję…';
-      spinner.style.display = 'inline-block';
-      // Wyzeruj pasek postępu Kick i uruchom pollowanie statusu
-      if (progressCounterKick) { progressCounterKick.textContent = '⏳ Generowanie…'; }
-      if (progressFillElKick) { progressFillElKick.style.width = '0%'; }
-      if (kickProgressContainer) kickProgressContainer.style.display = 'block';
-      if (kickProgressBar) kickProgressBar.style.display = 'block';
-      try {
-        await fetch('/api/generate-raport-kick');
-        startKickStatusPolling(true);
-      } finally {
-        btnKick.disabled = false;
-        btnKick.textContent = prevTxt;
-        spinner.style.display = 'none';
-      }
-    };
+    const btnKickEl = document.getElementById('btn-kick');
+    if (btnKickEl) {
+      btnKickEl.onclick = async () => {
+        if (btnKick.disabled) return;
+        btnKick.disabled = true;
+        const prevTxt = btnKick.textContent;
+        btnKick.textContent = 'Generuję…';
+        spinner.style.display = 'inline-block';
+        // Wyzeruj pasek postępu Kick i uruchom pollowanie statusu
+        if (progressCounterKick) { progressCounterKick.textContent = '⏳ Generowanie…'; }
+        if (progressFillElKick) { progressFillElKick.style.width = '0%'; }
+        if (kickProgressContainer) kickProgressContainer.style.display = 'block';
+        if (kickProgressBar) kickProgressBar.style.display = 'block';
+        try {
+          await fetch('/api/generate-raport-kick');
+          startKickStatusPolling(true);
+        } finally {
+          btnKick.disabled = false;
+          btnKick.textContent = prevTxt;
+          spinner.style.display = 'none';
+        }
+      };
+    }
 
 function pollKick() {
   return fetch('/api/report-kick-ready', { cache: 'no-store' })
@@ -1165,12 +1329,14 @@ function initReportFiltersAndStats(root) {
             panel.style.position = 'fixed';
             panel.style.right = '16px';
             panel.style.bottom = '64px';
-            panel.style.background = '#fafafa';
-            panel.style.border = '1px solid #ddd';
+            panel.style.background = 'var(--panel-bg)';
+            panel.style.border = '1px solid var(--border)';
             panel.style.borderRadius = '6px';
             panel.style.padding = '8px';
             panel.style.maxWidth = '360px';
             panel.style.zIndex = '9998';
+            panel.style.color = 'var(--text)';
+            panel.style.boxShadow = '0 8px 24px rgba(0,0,0,0.35)';
             document.body.appendChild(panel);
           }
           if (panel.style.display === 'none' || !panel.style.display){ renderSavedPanel(panel); panel.style.display = 'block'; }
@@ -1604,8 +1770,13 @@ function initReportFiltersAndStats(root) {
   // (usunięto zduplikowaną definicję updateGlobalCounters; funkcja jest zdefiniowana na górze skryptu)
 
     // PodÅ‚Ä…czamy eventy do przyciskÃ³w
-    document.getElementById('btn-update').addEventListener('click', runUpdate);
-    document.getElementById('btn-report').addEventListener('click', runReport);
+    try {
+      const elUpd = document.getElementById('btn-update');
+      if (elUpd) elUpd.addEventListener('click', runUpdate);
+      const elRep = document.getElementById('btn-report');
+      if (elRep) elRep.addEventListener('click', runReport);
+    } catch{}
+
     // Auto-odświeżanie: całkowicie lokalny timer bez zapytań do backendu
     window.addEventListener('load', async ()=>{
       console.log('[Kick] window.load: start');
@@ -1825,6 +1996,8 @@ function initReportFiltersAndStats(root) {
       document.getElementById('btn-deselect-all').addEventListener('click', deselectAllPosts);
       document.getElementById('btn-push-selected').addEventListener('click', pushSelectedToPubler);
       document.getElementById('btn-refresh-calendar').addEventListener('click', loadCalendarData);
+      const btnResetFailed = document.getElementById('btn-reset-failed');
+      if (btnResetFailed) btnResetFailed.addEventListener('click', resetFailedPosts);
       
       // Filter checkboxes
       document.getElementById('filter-scheduled').addEventListener('change', filterCalendarData);
@@ -1887,10 +2060,14 @@ function initReportFiltersAndStats(root) {
         const isSelected = selectedPosts.has(post.id || post.clip_id);
         const postId = post.id || post.clip_id;
         
-        // Wyświetl nazwę streamera i tytuł klipu jeśli dostępne
-        let title = post.caption || `Post ${postId}`;
-        if (post.clipData && post.clipData.broadcaster && post.clipData.title) {
+        // Ujednolicone nazewnictwo: najpierw caption, potem streamer - tytuł
+        let title = '';
+        if (post.caption && post.caption.trim()) {
+          title = post.caption.trim();
+        } else if (post.clipData && post.clipData.broadcaster && post.clipData.title) {
           title = `${post.clipData.broadcaster} - ${post.clipData.title}`;
+        } else {
+          title = `Post ${postId}`;
         }
         
         const date = post.scheduled_at || post.published_at || post.created_at || 'Brak daty';
@@ -1910,10 +2087,12 @@ function initReportFiltersAndStats(root) {
               <div class="calendar-post-status status-${post.status}">${getStatusText(post.status)}</div>
               <div class="calendar-post-actions" onclick="event.stopPropagation();">
                 ${post.status === 'scheduled' ? 
-                  `<button class="btn btn-sm" onclick="editPostTime('${postId}', '${date}')">Edytuj czas</button>
-                   <button class="btn btn-sm" onclick="pushSinglePost('${postId}')">Push</button>
-                   <button class="btn btn-sm btn-danger" onclick="deleteScheduledPost('${postId}')">Usuń</button>` : 
-                  ''}
+                  `<button class=\"btn btn-sm\" onclick=\"editPostTime('${postId}', '${date}')\">Edytuj czas</button>
+                   <button class=\"btn btn-sm\" onclick=\"pushSinglePost('${postId}')\">Push</button>
+                   <button class=\"btn btn-sm btn-danger\" onclick=\"deleteScheduledPost('${postId}')\">Usuń</button>` : 
+                  (post.status === 'failed' ?
+                  `<button class=\"btn btn-sm btn-warning\" onclick=\"retryFailedPost('${postId}')\">Ponów</button>` :
+                  '')}
               </div>
             </div>
           </div>
@@ -1952,6 +2131,39 @@ function initReportFiltersAndStats(root) {
         selectedPosts.add(checkbox.dataset.postId);
       });
       updatePushButton();
+    }
+    
+
+    async function resetFailedPosts() {
+      try {
+        const res = await fetch('/api/internal-scheduler/reset-failed', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          alert(`Zresetowano ${data.reset || data.reset_count || 0} postów z failed do scheduled`);
+        } else {
+          alert(`Błąd resetu: ${data.error || 'unknown'}`);
+        }
+        await loadCalendarData();
+      } catch (e) {
+        console.error('Błąd resetu nieudanych:', e);
+        alert('Błąd resetu nieudanych');
+      }
+    }
+
+    async function retryFailedPost(postId) {
+      try {
+        const res = await fetch(`/api/internal-scheduler/retry-failed/${postId}`, { method: 'POST' });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          alert(`Ponowiono publikację: ${postId}`);
+        } else {
+          alert(`Nie udało się ponowić: ${data.error || res.status}`);
+        }
+        await loadCalendarData();
+      } catch (e) {
+        console.error('Błąd ponowienia publikacji:', e);
+        alert('Błąd ponowienia publikacji');
+      }
     }
     
     function deselectAllPosts() {
@@ -2062,12 +2274,12 @@ function initReportFiltersAndStats(root) {
     
     async function pushSinglePost(postId) {
       try {
-        const response = await fetch(`/api/internal-scheduler/push-to-publer/post/${postId}`, {
+        const response = await fetch(`/api/internal-scheduler/push-now-to-publer/post/${postId}`, {
           method: 'POST'
         });
         
         if (response.ok) {
-          alert('Post przesłany do Publera');
+          alert('Post przesłany do Publera (publish_now)');
           loadCalendarData().catch(console.error); // Refresh calendar
         } else {
           alert('Błąd podczas przesyłania posta');
