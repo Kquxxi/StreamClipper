@@ -1,4 +1,4 @@
-# e2eClipUploader
+# StreamClipper
 
 ## Opis aplikacji
 
@@ -181,14 +181,3 @@ Wskazówki:
 - `locks/` – pliki blokad schedulera; ignorowane.
 - `*.tmp`, `*TEMP_MPY*` – pliki tymczasowe (np. MoviePy); ignorowane.
 
-## Proponowana nazwa aplikacji
-
-- Aktualna nazwa: `e2eClipUploader`.
-- Rekomendacje (z krótką motywacją):
-  - `ClipFlow` / `KlipyFlow` – podkreśla płynny przepływ od klipu do publikacji (E2E pipeline).
-  - `ClipPilot` / `KlipyPilot` – „pilot” prowadzący przez selekcję, render i publikację.
-  - `ClipForge` / `KlipyForge` – akcent na „obrabianie” i składanie klipów.
-  - `StreamClipper` – jasne skojarzenie ze streamami i cięciem klipów.
-  - `ClipCaster` – wydźwięk nadawania/emitowania gotowych materiałów.
-
-Sugeruję `ClipFlow` (polska wersja: `KlipyFlow`) – jest zwięzła, neutralna, dobrze oddaje przepływ pracy i skalę funkcji.
