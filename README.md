@@ -6,13 +6,11 @@
 - Udostępnia interfejs webowy (`/editor`) oraz API do raportów i automatyzacji.
 - Tworzy raporty popularnych klipów i streamerów (Twitch/Kick), wspiera preferencje (`streamers_prefs.json`) i filtrowanie.
 - Integracja z Publer (API) umożliwia publikację/schedulowanie postów; lokalny scheduler utrzymuje kolejkę w `scheduled_posts.json`.
-- Dane użytkownika i artefakty (cache, media, transkrypcje) są przechowywane lokalnie i ignorowane przez Git zgodnie z `.gitignore`.
 
 ## Dlaczego i dla kogo
 
 - Dla twórców i operatorów kanałów, którzy chcą automatyzować tworzenie krótkich form z materiałów Twitch/Kick.
 - Redukuje czas ręcznej pracy: od znalezienia klipu, przez transkrypcję i render, po publikację.
-- Minimalizuje ryzyko wycieku danych: sekrety i pliki wrażliwe są w `.env`/lokalnym storage, a repo trzyma tylko kod i przykłady.
 
 ## Najważniejsze funkcje
 
