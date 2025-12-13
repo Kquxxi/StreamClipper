@@ -1,5 +1,40 @@
 # e2eClipUploader
 
+## Opis aplikacji
+
+- End‑to‑end narzędzie do pobierania, selekcji, transkrypcji, kadrowania (crop), renderowania i publikacji krótkich klipów z Twitch i Kick.
+- Udostępnia interfejs webowy (`/editor`) do pracy z klipami oraz rozbudowane API do raportów i automatyzacji.
+- Generuje raporty popularnych klipów/streamerów (Twitch/Kick), pozwala oznaczać preferencje streamerów i filtrować wyniki.
+- Integruje się z Publer (API) w celu publikacji/schedulingu postów, dodatkowo posiada wewnętrzny lokalny scheduler, który utrzymuje kolejkę w plikach JSON.
+- Przechowuje dane użytkownika i artefakty render/transkrypcji lokalnie (JSON + `media/**`), a repozytorium ignoruje je zgodnie z `.gitignore`.
+
+## Architektura i przepływ działania
+
+- Pobieranie danych: skrypty i endpointy zbierają klipy/streamerów (Twitch przez `twitchAPI`, Kick przez `KickApi`/scraper z cookies) i zapisują wyniki do lokalnych plików.
+- Raportowanie: generatory raportów (Twitch/Kick) produkują dane i HTML‑fragmenty do podglądu; UI wyświetla jednolite tabele z filtrowaniem/prezentacją.
+- Selekcja i cache: przez `/editor` wybierasz klipy; `/api/ensure-cache` pobiera pliki i tworzy prewki (z użyciem `yt-dlp` i `imageio-ffmpeg`).
+- Transkrypcja i crop: `/api/transcribe` uruchamia pipeline (WhisperX przez adapter w `pipeline/transcribe`), `/api/crop` zapisuje parametry kadrowania.
+- Render: `/api/render` tworzy eksport wideo (parametry z JSON); pliki wynikowe trafiają do `media/exports/**`.
+- Publikacja: `/publish/<clip_id>` pakuje metadane i media, komunikuje się z Publer; wewnętrzny scheduler utrzymuje kolejkę w `scheduled_posts.json`.
+
+## Narzędzia i technologie
+
+- `Python` (aplikacja serwerowa i skrypty pomocnicze).
+- `Flask` (serwer HTTP i UI), `Jinja2` (szablony HTML przez Flask/generator raportów).
+- `requests`, `twitchAPI`, `KickApi` (integracje zewnętrzne), `python-dotenv` (konfiguracja przez `.env`).
+- `APScheduler` / `schedule` (zadania cykliczne, wewnętrzny scheduler publikacji).
+- `yt-dlp`, `imageio-ffmpeg` (pobieranie mediów, generowanie prewek), opcjonalnie ślady `MoviePy` (tymczasowe `*TEMP_MPY*`).
+- `Cloudflared` (opcjonalne wystawienie lokalnego serwera na publiczny URL).
+
+## Funkcje kluczowe
+
+- UI edycji/wyboru klipów (`/editor`) z podglądem i zapisem selekcji (`selection.json`).
+- Raporty Twitch/Kick z filtrowaniem i preferencjami streamerów (`streamers_prefs.json`).
+- Transkrypcja (WhisperX) i ustawienia crop dla eksportów pionowych.
+- Renderowanie wideo i serwowanie plików (previews/exports/subtitles).
+- Harmonogram publikacji: lokalna kolejka (`scheduled_posts.json`) + integracja Publer API.
+- API pomocnicze do pobrania cache, statusów zadań oraz zarządzania schedulerem.
+
 ## Konfiguracja środowiska (.env)
 
 1. Skopiuj plik `.env.example` do `.env`.
@@ -99,8 +134,3 @@ Wskazówki:
 - `transcribe/*.json`, `transcribe/*.srt` – wyniki transkrypcji; ignorowane.
 - `locks/` – pliki blokad schedulera; ignorowane.
 - `*.tmp`, `*TEMP_MPY*` – pliki tymczasowe (np. MoviePy); ignorowane.
-
-## Licencja
-
-- Nie wybrano licencji. Domyślnie obowiązuje „all rights reserved”: inni mogą przeglądać kod, ale nie mogą go legalnie używać, modyfikować ani rozpowszechniać.
-- Jeśli chcesz dopuścić użycie (open‑source), rozważ dodanie licencji (np. MIT lub Apache‑2.0). Decyzję można podjąć później — dokumentacja jest gotowa na obie opcje.
