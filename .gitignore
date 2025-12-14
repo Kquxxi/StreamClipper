@@ -3,6 +3,7 @@ config.env
 .env
 .env.*
 *.env
+!.env.example
 
 # Cookies (browser/session dumps)
 *cookies*.txt
@@ -43,6 +44,8 @@ htmlcov/
 .vscode/
 .idea/
 *.code-workspace
+.python-version
+.tool-versions
 
 # OS junk
 .DS_Store
@@ -87,6 +90,9 @@ ensure_cache_progress.json
 kick/kick_clips_cache*.json
 database_backup_*.json
 selection_backup_*.json
+# Local sqlite/db files
+*.sqlite
+*.db
 # Local test data files (not versioned)
 database_test.json
 *_test.json
