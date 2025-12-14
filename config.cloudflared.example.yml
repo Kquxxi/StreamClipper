@@ -14,3 +14,5 @@ ingress:
   - service: http_status:404
 
 # Po uruchomieniu tunelu ustaw `PUBLIC_BASE_URL` w .env na publiczny URL (bez końcowego "/").
+
+# Wskazówka: `PUBLIC_BASE_URL` powinien wskazywać bieżący hostname tunelu.
