@@ -1,5 +1,6 @@
 # StreamClipper
 
+
 ## Opis aplikacji
 
 - Aplikacja do pełnego procesu pracy z klipami: pobieranie z Twitch/Kick, selekcja, transkrypcja, kadrowanie (crop), renderowanie i publikacja.
@@ -178,4 +179,3 @@ Wskazówki:
 - `transcribe/*.json`, `transcribe/*.srt` – wyniki transkrypcji; ignorowane.
 - `locks/` – pliki blokad schedulera; ignorowane.
 - `*.tmp`, `*TEMP_MPY*` – pliki tymczasowe (np. MoviePy); ignorowane.
-
