@@ -24,7 +24,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from scheduler import scheduler
 
 
-app = Flask(
+app = Flask( 
     __name__,
     static_folder='../static',
     template_folder='../templates'
