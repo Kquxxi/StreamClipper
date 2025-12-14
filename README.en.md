@@ -1,5 +1,6 @@
 # StreamClipper
 
+
 ## Environment Setup (.env)
 
 1. Copy `.env.example` to `.env`.
